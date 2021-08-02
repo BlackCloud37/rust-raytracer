@@ -1,5 +1,6 @@
 [workspace]
 
 members = [
-    "blackcloud37",
+    "raytracer",
+    "raytracer_codegen",
 ]
