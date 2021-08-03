@@ -2,7 +2,6 @@ use crate::material::{ConstantTexture, DiffuseLight};
 use crate::material::{HitRecord, Hitable};
 use crate::Ray;
 use crate::Vec3;
-use image::Rgb;
 use raytracer_codegen::make_spheres_impl;
 
 // Call the procedural macro, which will become `make_spheres` function.
@@ -56,7 +55,7 @@ impl Hitable for Sphere {
         let a = r.dir.squared_length();
         let half_b = oc * r.dir;
         let c = oc.squared_length() - self.radius * self.radius;
-        let discriminant = half_b * half_b - a * c;
+        let discriminant = half_b.powf(2.0) - a * c;
         if discriminant < 0. {
             return None;
         }
@@ -75,7 +74,7 @@ impl Hitable for Sphere {
         let p = r.at(root);
         let outward_normal = (p - self.center) / self.radius;
         let rec = HitRecord::new(root, outward_normal, r);
-        return Some(rec);
+        Some(rec)
     }
 }
 
@@ -111,17 +110,18 @@ impl World {
 }
 
 pub fn example_scene() -> World {
-    let mut hittable_list: Vec<Box<dyn Hitable + Send + Sync>> = vec![];
-    hittable_list.push(Box::new(Sphere {
-        center: Vec3::new(0., 0., -1.),
-        radius: 0.5,
-        material: DiffuseLight(ConstantTexture(Vec3::zero())),
-    }));
-    hittable_list.push(Box::new(Sphere {
-        center: Vec3::new(0., -100.5, -1.),
-        radius: 100.,
-        material: DiffuseLight(ConstantTexture(Vec3::zero())),
-    }));
+    let mut hittable_list: Vec<Box<dyn Hitable + Send + Sync>> = vec![
+        Box::new(Sphere {
+            center: Vec3::new(0., 0., -1.),
+            radius: 0.5,
+            material: DiffuseLight(ConstantTexture(Vec3::zero())),
+        }),
+        Box::new(Sphere {
+            center: Vec3::new(0., -100.5, -1.),
+            radius: 100.,
+            material: DiffuseLight(ConstantTexture(Vec3::zero())),
+        }),
+    ];
     World {
         hitable_list: hittable_list,
         cam: Camera::default(),

@@ -5,7 +5,6 @@ mod ray;
 mod scene;
 mod vec3;
 
-use crate::scene::Camera;
 use image::{ImageBuffer, Rgb, RgbImage};
 use indicatif::ProgressBar;
 use rand::Rng;
@@ -64,7 +63,7 @@ fn main() {
                 // y is real position in final image
                 for (img_y, y) in (row_begin..row_end).enumerate() {
                     let mut pixel_color = Vec3::zero();
-                    for s in 0..samples_per_pixel {
+                    for _s in 0..samples_per_pixel {
                         let u = (x as f64 + rng.gen::<f64>()) / (width - 1) as f64;
                         let v = (y as f64 + rng.gen::<f64>()) / (height - 1) as f64;
                         let r = world_ptr.cam.get_ray(u, v);
