@@ -1,6 +1,6 @@
-#![allow(dead_code)]
-// You SHOULD remove above line in your code.
-
+use crate::material::Hitable;
+use crate::material::{ConstantTexture, DiffuseLight};
+use crate::Ray;
 use crate::Vec3;
 use crate::World;
 use raytracer_codegen::make_spheres_impl;
@@ -8,17 +8,21 @@ use raytracer_codegen::make_spheres_impl;
 // Call the procedural macro, which will become `make_spheres` function.
 make_spheres_impl! {}
 
-// These three structs are just written here to make it compile.
-// You should `use` your own structs in this file.
-// e.g. replace next two lines with
-// `use crate::materials::{DiffuseLight, ConstantTexture}`
-pub struct ConstantTexture(Vec3);
-pub struct DiffuseLight(ConstantTexture);
-
 pub struct Sphere {
-    center: Vec3,
-    radius: f64,
-    material: DiffuseLight,
+    pub center: Vec3,
+    pub radius: f64,
+    pub material: DiffuseLight,
+}
+
+impl Hitable for Sphere {
+    fn hit(&self, r: &Ray) -> bool {
+        let oc = r.orig - self.center;
+        let a = r.dir.squared_length();
+        let b = 2. * oc * r.dir;
+        let c = oc.squared_length() - self.radius * self.radius;
+        let discriminant = b * b - 4. * a * c;
+        discriminant > 0.
+    }
 }
 
 pub fn example_scene() -> World {

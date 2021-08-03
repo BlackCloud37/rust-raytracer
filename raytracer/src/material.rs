@@ -1,11 +1,12 @@
-#![allow(dead_code)]
-#![allow(clippy::boxed_local)]
-// You SHOULD remove above line in your code.
-
 // This file shows necessary examples of how to complete Track 4 and 5.
+use crate::Ray;
+use crate::Vec3;
 
 pub trait Texture {}
 pub trait Material {}
+
+pub struct ConstantTexture(pub Vec3);
+pub struct DiffuseLight(pub ConstantTexture);
 
 /// `Lambertian` now takes a generic parameter `T`.
 /// This reduces the overhead of using `Box<dyn Texture>`
@@ -22,7 +23,9 @@ impl<T: Texture> Lambertian<T> {
 
 impl<T: Texture> Material for Lambertian<T> {}
 
-pub trait Hitable {}
+pub trait Hitable {
+    fn hit(&self, r: &Ray) -> bool;
+}
 pub struct AABB;
 
 /// This BVHNode should be constructed statically.
