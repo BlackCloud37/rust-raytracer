@@ -15,13 +15,17 @@ pub struct Sphere {
 }
 
 impl Hitable for Sphere {
-    fn hit(&self, r: &Ray) -> bool {
+    fn hit(&self, r: &Ray) -> f64 {
         let oc = r.orig - self.center;
         let a = r.dir.squared_length();
-        let b = 2. * oc * r.dir;
+        let half_b = oc * r.dir;
         let c = oc.squared_length() - self.radius * self.radius;
-        let discriminant = b * b - 4. * a * c;
-        discriminant > 0.
+        let discriminant = half_b * half_b - a * c;
+        return if discriminant < 0. {
+            -1.0
+        } else {
+            (-half_b - discriminant.sqrt()) / a
+        };
     }
 }
 

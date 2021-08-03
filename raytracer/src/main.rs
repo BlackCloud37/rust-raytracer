@@ -28,13 +28,15 @@ impl World {
             radius: 0.5,
             material: DiffuseLight(ConstantTexture(Vec3::zero())),
         };
-        return if sp.hit(&r) {
-            Vec3::new(1., 0., 0.).to_color()
+        let t = sp.hit(&r);
+        if t > 0. {
+            let n = (r.at(t) - Vec3::new(0., 0., -1.)).unit();
+            (0.5 * Vec3::new(n.x + 1., n.y + 1., n.z + 1.)).to_color()
         } else {
             let unit_direction = r.dir.unit();
             let t = 0.5 * unit_direction.y + 1.;
             ((1.0 - t) * Vec3::new(1., 1., 1.) + t * Vec3::new(0.5, 0.7, 1.0)).to_color()
-        };
+        }
     }
 }
 

@@ -24,7 +24,7 @@ impl<T: Texture> Lambertian<T> {
 impl<T: Texture> Material for Lambertian<T> {}
 
 pub trait Hitable {
-    fn hit(&self, r: &Ray) -> bool;
+    fn hit(&self, r: &Ray) -> f64;
 }
 pub struct AABB;
 
