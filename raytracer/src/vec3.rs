@@ -1,6 +1,7 @@
-use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign, Div, Neg};
+use image::Rgb;
+use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Copy)]
 pub struct Vec3 {
     pub x: f64,
     pub y: f64,
@@ -47,8 +48,17 @@ impl Vec3 {
     pub fn unit(&self) -> Vec3 {
         match self {
             v if v.length() == 0. => panic!(),
-            _ => self / self.length()
+            _ => self / self.length(),
         }
+    }
+
+    pub fn to_color(self) -> Rgb<u8> {
+        let map = |x: f64| {
+            let mut rx = x.min(1.0);
+            rx = rx.max(0.);
+            (rx * 255.) as u8
+        };
+        Rgb([map(self.x), map(self.y), map(self.z)])
     }
 }
 
@@ -103,7 +113,7 @@ impl Sub for Vec3 {
         Self {
             x: self.x - other.x,
             y: self.y - other.y,
-            z: self.z - other.z
+            z: self.z - other.z,
         }
     }
 }
@@ -115,7 +125,7 @@ impl Sub<f64> for Vec3 {
         Self {
             x: self.x - other,
             y: self.y - other,
-            z: self.z - other
+            z: self.z - other,
         }
     }
 }
@@ -148,6 +158,18 @@ impl Mul for Vec3 {
     }
 }
 
+impl Mul<Vec3> for f64 {
+    type Output = Vec3;
+
+    fn mul(self, other: Vec3) -> Self::Output {
+        Vec3 {
+            x: other.x * self,
+            y: other.y * self,
+            z: other.z * self,
+        }
+    }
+}
+
 impl Mul<f64> for Vec3 {
     type Output = Self;
 
@@ -155,7 +177,7 @@ impl Mul<f64> for Vec3 {
         Self {
             x: self.x * other,
             y: self.y * other,
-            z: self.z * other
+            z: self.z * other,
         }
     }
 }
@@ -165,7 +187,7 @@ impl MulAssign<f64> for Vec3 {
         *self = Self {
             x: self.x * other,
             y: self.y * other,
-            z: self.z * other
+            z: self.z * other,
         }
     }
 }
@@ -176,7 +198,7 @@ impl Div<f64> for Vec3 {
         Self {
             x: self.x / other,
             y: self.y / other,
-            z: self.z / other
+            z: self.z / other,
         }
     }
 }
@@ -187,7 +209,7 @@ impl Div<f64> for &Vec3 {
         Vec3 {
             x: self.x / other,
             y: self.y / other,
-            z: self.z / other
+            z: self.z / other,
         }
     }
 }
@@ -288,7 +310,10 @@ mod tests {
 
     #[test]
     fn test_div() {
-        assert_eq!(Vec3::new(1.0, -2.0, 0.0) / 2.0_f64, Vec3::new(0.5, -1.0, 0.0));
+        assert_eq!(
+            Vec3::new(1.0, -2.0, 0.0) / 2.0_f64,
+            Vec3::new(0.5, -1.0, 0.0)
+        );
     }
 
     #[test]
@@ -311,7 +336,6 @@ mod tests {
     fn test_neg() {
         assert_eq!(-Vec3::new(1.0, -2.0, 3.0), Vec3::new(-1.0, 2.0, -3.0));
     }
-
 
     #[test]
     fn test_squared_length() {
