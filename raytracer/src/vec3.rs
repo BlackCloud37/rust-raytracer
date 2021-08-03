@@ -1,5 +1,5 @@
 use image::Rgb;
-use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 #[derive(Clone, Debug, PartialEq, Copy)]
 pub struct Vec3 {
@@ -51,14 +51,15 @@ impl Vec3 {
             _ => self / self.length(),
         }
     }
+}
 
-    pub fn to_color(self) -> Rgb<u8> {
-        let map = |x: f64| {
-            let mut rx = x.min(1.0);
-            rx = rx.max(0.);
-            (rx * 255.) as u8
-        };
-        Rgb([map(self.x), map(self.y), map(self.z)])
+impl From<Vec3> for Rgb<u8> {
+    fn from(item: Vec3) -> Self {
+        Self([
+            (item.x.clamp(0., 1.) * 255.).floor() as u8,
+            (item.y.clamp(0., 1.) * 255.).floor() as u8,
+            (item.z.clamp(0., 1.) * 255.).floor() as u8,
+        ])
     }
 }
 
@@ -207,6 +208,16 @@ impl Div<f64> for &Vec3 {
     type Output = Vec3;
     fn div(self, other: f64) -> Self::Output {
         Vec3 {
+            x: self.x / other,
+            y: self.y / other,
+            z: self.z / other,
+        }
+    }
+}
+
+impl DivAssign<f64> for Vec3 {
+    fn div_assign(&mut self, other: f64) {
+        *self = Self {
             x: self.x / other,
             y: self.y / other,
             z: self.z / other,

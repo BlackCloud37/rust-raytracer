@@ -13,3 +13,4 @@ imageproc = "0.21"
 rusttype = "0.9"
 threadpool = "1.8"
 raytracer_codegen = { path = "../raytracer_codegen" }
+rand = "0.8.4"

@@ -8,6 +8,42 @@ use raytracer_codegen::make_spheres_impl;
 // Call the procedural macro, which will become `make_spheres` function.
 make_spheres_impl! {}
 
+pub struct Camera {
+    pub origin: Vec3,
+    pub lower_left_corner: Vec3,
+    pub horizontal: Vec3,
+    pub vertical: Vec3,
+}
+
+impl Camera {
+    pub fn default() -> Self {
+        let aspect_ratio = 16. / 9.;
+        let viewport_height = 2.;
+        let viewport_width = aspect_ratio * viewport_height;
+        let focal_length = 1.;
+
+        let origin = Vec3::zero();
+        let horizontal = Vec3::new(viewport_width, 0., 0.);
+        let vertical = Vec3::new(0., viewport_height, 0.);
+        Self {
+            origin,
+            horizontal,
+            vertical,
+            lower_left_corner: origin
+                - horizontal / 2.
+                - vertical / 2.
+                - Vec3::new(0., 0., focal_length),
+        }
+    }
+
+    pub fn get_ray(&self, u: f64, v: f64) -> Ray {
+        Ray::new(
+            self.origin,
+            self.lower_left_corner + u * self.horizontal + v * self.vertical - self.origin,
+        )
+    }
+}
+
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f64,
@@ -59,16 +95,17 @@ impl Hitable for Vec<Box<dyn Hitable + Send + Sync>> {
 
 pub struct World {
     pub hitable_list: Vec<Box<dyn Hitable + Send + Sync>>,
+    pub cam: Camera,
 }
 
 impl World {
-    pub fn ray_color(&self, r: Ray) -> Rgb<u8> {
+    pub fn ray_color(&self, r: Ray) -> Vec3 {
         if let Some(rec) = self.hitable_list.hit(&r, 0., f64::INFINITY) {
-            (0.5 * Vec3::new(rec.normal.x + 1., rec.normal.y + 1., rec.normal.z + 1.)).to_color()
+            0.5 * Vec3::new(rec.normal.x + 1., rec.normal.y + 1., rec.normal.z + 1.)
         } else {
             let unit_direction = r.dir.unit();
             let t = 0.5 * unit_direction.y + 1.;
-            ((1.0 - t) * Vec3::new(1., 1., 1.) + t * Vec3::new(0.5, 0.7, 1.0)).to_color()
+            (1.0 - t) * Vec3::new(1., 1., 1.) + t * Vec3::new(0.5, 0.7, 1.0)
         }
     }
 }
@@ -87,5 +124,6 @@ pub fn example_scene() -> World {
     }));
     World {
         hitable_list: hittable_list,
+        cam: Camera::default(),
     }
 }
