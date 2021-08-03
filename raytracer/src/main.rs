@@ -10,6 +10,7 @@ use indicatif::ProgressBar;
 use rand::Rng;
 pub use ray::Ray;
 use scene::example_scene;
+use std::cmp::max;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use threadpool::ThreadPool;
@@ -37,6 +38,7 @@ fn main() {
     let width = 1024;
     let height = (width as f64 / aspect_ratio) as u32;
 
+    let max_depth = 50;
     let samples_per_pixel = 100;
     // create a channel to send objects between threads
     let (tx, rx) = channel();
@@ -67,7 +69,7 @@ fn main() {
                         let u = (x as f64 + rng.gen::<f64>()) / (width - 1) as f64;
                         let v = (y as f64 + rng.gen::<f64>()) / (height - 1) as f64;
                         let r = world_ptr.cam.get_ray(u, v);
-                        pixel_color += world_ptr.ray_color(r);
+                        pixel_color += world_ptr.ray_color(r, max_depth);
                     }
                     pixel_color /= samples_per_pixel as f64;
                     let pixel = img.get_pixel_mut(x, img_y as u32);

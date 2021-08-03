@@ -81,6 +81,7 @@ impl Hitable for Sphere {
 impl Hitable for Vec<Box<dyn Hitable + Send + Sync>> {
     fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
         let mut closest_so_far = t_max;
+        let mut closest_so_far = t_max;
         let mut res = None;
         for object in self {
             if let Some(temp_rec) = object.hit(r, t_min, closest_so_far) {
@@ -98,9 +99,14 @@ pub struct World {
 }
 
 impl World {
-    pub fn ray_color(&self, r: Ray) -> Vec3 {
-        if let Some(rec) = self.hitable_list.hit(&r, 0., f64::INFINITY) {
-            0.5 * Vec3::new(rec.normal.x + 1., rec.normal.y + 1., rec.normal.z + 1.)
+    pub fn ray_color(&self, r: Ray, depth: i32) -> Vec3 {
+        if depth <= 0 {
+            return Vec3::zero();
+        }
+
+        if let Some(rec) = self.hitable_list.hit(&r, 0.001, f64::INFINITY) {
+            let target = rec.p + rec.normal + Vec3::random_in_unit_sphere();
+            0.5 * self.ray_color(Ray::new(rec.p, target - rec.p), depth - 1)
         } else {
             let unit_direction = r.dir.unit();
             let t = 0.5 * unit_direction.y + 1.;
@@ -110,7 +116,7 @@ impl World {
 }
 
 pub fn example_scene() -> World {
-    let mut hittable_list: Vec<Box<dyn Hitable + Send + Sync>> = vec![
+    let mut hitable_list: Vec<Box<dyn Hitable + Send + Sync>> = vec![
         Box::new(Sphere {
             center: Vec3::new(0., 0., -1.),
             radius: 0.5,
@@ -123,7 +129,7 @@ pub fn example_scene() -> World {
         }),
     ];
     World {
-        hitable_list: hittable_list,
+        hitable_list,
         cam: Camera::default(),
     }
 }

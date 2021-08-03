@@ -1,4 +1,5 @@
 use image::Rgb;
+use rand::Rng;
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 #[derive(Clone, Debug, PartialEq, Copy)]
@@ -51,14 +52,35 @@ impl Vec3 {
             _ => self / self.length(),
         }
     }
+
+    pub fn random() -> Vec3 {
+        let mut rng = rand::thread_rng();
+        Vec3::new(rng.gen::<f64>(), rng.gen::<f64>(), rng.gen::<f64>())
+    }
+
+    pub fn random_in_range(min: f64, max: f64) -> Vec3 {
+        let mut rng = rand::thread_rng();
+        let remap = |x: f64| x * max + min;
+        Vec3::new(remap(rng.gen()), remap(rng.gen()), remap(rng.gen()))
+    }
+
+    pub fn random_in_unit_sphere() -> Vec3 {
+        loop {
+            let p = Vec3::random_in_range(-1., 1.);
+            if p.squared_length() >= 1. {
+                continue;
+            }
+            return p;
+        }
+    }
 }
 
 impl From<Vec3> for Rgb<u8> {
     fn from(item: Vec3) -> Self {
         Self([
-            (item.x.clamp(0., 1.) * 255.).floor() as u8,
-            (item.y.clamp(0., 1.) * 255.).floor() as u8,
-            (item.z.clamp(0., 1.) * 255.).floor() as u8,
+            (item.x.sqrt().clamp(0., 1.) * 255.).floor() as u8,
+            (item.y.sqrt().clamp(0., 1.) * 255.).floor() as u8,
+            (item.z.sqrt().clamp(0., 1.) * 255.).floor() as u8,
         ])
     }
 }
