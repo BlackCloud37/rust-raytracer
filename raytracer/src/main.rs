@@ -5,10 +5,7 @@ mod ray;
 mod scene;
 mod vec3;
 
-use crate::material::Hitable;
-use crate::material::{ConstantTexture, DiffuseLight};
-use crate::scene::Sphere;
-use image::{ImageBuffer, Rgb, RgbImage};
+use image::{ImageBuffer, RgbImage};
 use indicatif::ProgressBar;
 pub use ray::Ray;
 use scene::example_scene;
@@ -16,29 +13,6 @@ use std::sync::mpsc::channel;
 use std::sync::Arc;
 use threadpool::ThreadPool;
 pub use vec3::Vec3;
-
-pub struct World {
-    pub height: u32,
-}
-
-impl World {
-    pub fn ray_color(&self, r: Ray) -> Rgb<u8> {
-        let sp = Sphere {
-            center: Vec3::new(0., 0., -1.),
-            radius: 0.5,
-            material: DiffuseLight(ConstantTexture(Vec3::zero())),
-        };
-        let t = sp.hit(&r);
-        if t > 0. {
-            let n = (r.at(t) - Vec3::new(0., 0., -1.)).unit();
-            (0.5 * Vec3::new(n.x + 1., n.y + 1., n.z + 1.)).to_color()
-        } else {
-            let unit_direction = r.dir.unit();
-            let t = 0.5 * unit_direction.y + 1.;
-            ((1.0 - t) * Vec3::new(1., 1., 1.) + t * Vec3::new(0.5, 0.7, 1.0)).to_color()
-        }
-    }
-}
 
 fn is_ci() -> bool {
     option_env!("CI").unwrap_or_default() == "true"
