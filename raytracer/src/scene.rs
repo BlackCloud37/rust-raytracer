@@ -1,10 +1,8 @@
-use crate::material::{ConstantTexture, DiffuseLight, Lambertian, Material, Metal};
+use crate::material::{ConstantTexture, Dielectric, DiffuseLight, Lambertian, Material, Metal};
 use crate::material::{HitRecord, Hitable};
 use crate::Ray;
 use crate::Vec3;
 use raytracer_codegen::make_spheres_impl;
-use std::borrow::Borrow;
-use std::rc::Rc;
 use std::sync::Arc;
 
 // Call the procedural macro, which will become `make_spheres` function.
@@ -122,21 +120,27 @@ impl World {
 
 pub fn example_scene() -> World {
     let hitable_list: Vec<Box<dyn Hitable + Send + Sync>> = vec![
-        Box::new(Sphere {
-            center: Vec3::new(0., 0., -1.),
-            radius: 0.5,
-            material: Arc::new(Lambertian::new(ConstantTexture(Vec3::new(0.7, 0.3, 0.3)))),
-        }),
+        // ground
         Box::new(Sphere {
             center: Vec3::new(0., -100.5, -1.),
             radius: 100.,
             material: Arc::new(Lambertian::new(ConstantTexture(Vec3::new(0.8, 0.8, 0.0)))),
         }),
+        // center
+        Box::new(Sphere {
+            center: Vec3::new(0., 0., -1.),
+            radius: 0.5,
+            material: Arc::new(Lambertian::new(ConstantTexture(Vec3::new(0.1, 0.2, 0.5)))),
+            // material: Arc::new(Dielectric::new(1.5)),
+        }),
+        //right
         Box::new(Sphere {
             center: Vec3::new(-1.0, 0.0, -1.0),
             radius: 0.5,
-            material: Arc::new(Metal::new(ConstantTexture(Vec3::new(0.8, 0.8, 0.8)), 0.)),
+            // material: Arc::new(Metal::new(ConstantTexture(Vec3::new(0.8, 0.8, 0.8)), 0.)),
+            material: Arc::new(Dielectric::new(1.5)),
         }),
+        //left
         Box::new(Sphere {
             center: Vec3::new(1.0, 0.0, -1.0),
             radius: 0.5,

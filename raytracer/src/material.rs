@@ -1,7 +1,7 @@
 // This file shows necessary examples of how to complete Track 4 and 5.
 use crate::Ray;
 use crate::Vec3;
-use std::ptr::null;
+use rand::Rng;
 use std::sync::Arc;
 
 pub trait Texture {
@@ -73,6 +73,43 @@ impl<T: Texture> Material for Metal<T> {
     }
 }
 
+pub struct Dielectric {
+    pub ir: f64,
+}
+
+impl Dielectric {
+    pub fn new(ir: f64) -> Self {
+        Self { ir }
+    }
+    pub fn reflectance(cosine: f64, ref_idx: f64) -> f64 {
+        // Use Schlick's approximation for reflectance
+        let r0 = ((1. - ref_idx) / (1. + ref_idx)).powf(2.);
+        r0 + (1. - r0) * (1. - cosine).powf(5.)
+    }
+}
+
+impl Material for Dielectric {
+    fn scatter(&self, r: &Ray, rec: &HitRecord) -> Option<(Vec3, Ray)> {
+        let attenuation = Vec3::ones();
+        let refraction_ratio = if rec.front_face {
+            1.0 / self.ir
+        } else {
+            self.ir
+        };
+        let unit_direction = r.dir.unit();
+        let cos_theta = (-unit_direction * rec.normal).min(1.0);
+        let sin_theta = (1.0 - cos_theta.powf(2.0)).sqrt();
+        let cannot_refract = refraction_ratio * sin_theta > 1.0;
+        let mut rng = rand::thread_rng();
+        let direction =
+            if cannot_refract || Self::reflectance(cos_theta, refraction_ratio) > rng.gen() {
+                Vec3::reflect(unit_direction, rec.normal)
+            } else {
+                Vec3::refract(unit_direction, rec.normal, refraction_ratio)
+            };
+        Some((attenuation, Ray::new(rec.p, direction)))
+    }
+}
 pub struct HitRecord {
     pub p: Vec3,
     pub normal: Vec3,
