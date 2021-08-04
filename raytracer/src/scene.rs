@@ -1,8 +1,8 @@
-use crate::material::{ConstantTexture, Dielectric, DiffuseLight, Lambertian, Material, Metal};
+use crate::material::{ConstantTexture, Dielectric, Lambertian, Material, Metal};
 use crate::material::{HitRecord, Hitable};
 use crate::Ray;
 use crate::Vec3;
-use raytracer_codegen::make_spheres_impl;
+use rand::Rng;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
@@ -57,25 +57,6 @@ impl Camera {
             lens_radius: aperture / 2.,
         }
     }
-    // pub fn default() -> Self {
-    //     let aspect_ratio = 16. / 9.;
-    //     let viewport_height = 2.;
-    //     let viewport_width = aspect_ratio * viewport_height;
-    //     let focal_length = 1.;
-    //
-    //     let origin = Vec3::zero();
-    //     let horizontal = Vec3::new(viewport_width, 0., 0.);
-    //     let vertical = Vec3::new(0., viewport_height, 0.);
-    //     Self {
-    //         origin,
-    //         horizontal,
-    //         vertical,
-    //         lower_left_corner: origin
-    //             - horizontal / 2.
-    //             - vertical / 2.
-    //             - Vec3::new(0., 0., focal_length),
-    //     }
-    // }
 
     pub fn get_ray(&self, s: f64, t: f64) -> Ray {
         let rd: Vec3 = self.lens_radius * Vec3::random_in_unit_disk();
@@ -117,7 +98,7 @@ impl Hitable for Sphere {
 
         let p = r.at(root);
         let outward_normal = (p - self.center) / self.radius;
-        let mut rec = HitRecord::new(root, outward_normal, r, Arc::clone(&self.material));
+        let rec = HitRecord::new(root, outward_normal, r, Arc::clone(&self.material));
         Some(rec)
     }
 }
@@ -161,45 +142,120 @@ impl World {
     }
 }
 
-pub fn example_scene() -> World {
-    let hitable_list: Vec<Box<dyn Hitable + Send + Sync>> = vec![
-        // ground
+// pub fn example_scene() -> World {
+//     let hitable_list: Vec<Box<dyn Hitable + Send + Sync>> = vec![
+//         // ground
+//         Box::new(Sphere {
+//             center: Vec3::new(0., -100.5, -1.),
+//             radius: 100.,
+//             material: Arc::new(Lambertian::new(ConstantTexture(Vec3::new(0.8, 0.8, 0.0)))),
+//         }),
+//         // center
+//         Box::new(Sphere {
+//             center: Vec3::new(0., 0., -1.),
+//             radius: 0.5,
+//             material: Arc::new(Lambertian::new(ConstantTexture(Vec3::new(0.1, 0.2, 0.5)))),
+//             // material: Arc::new(Dielectric::new(1.5)),
+//         }),
+//         //right
+//         Box::new(Sphere {
+//             center: Vec3::new(-1.0, 0.0, -1.0),
+//             radius: 0.5,
+//             // material: Arc::new(Metal::new(ConstantTexture(Vec3::new(0.8, 0.8, 0.8)), 0.)),
+//             material: Arc::new(Dielectric::new(1.5)),
+//         }),
+//         //left
+//         Box::new(Sphere {
+//             center: Vec3::new(1.0, 0.0, -1.0),
+//             radius: 0.5,
+//             material: Arc::new(Metal::new(ConstantTexture(Vec3::new(0.8, 0.6, 0.2)), 0.)),
+//         }),
+//     ];
+//     World {
+//         hitable_list,
+//         cam: Camera::new(
+//             Vec3::new(3., 3., 2.),
+//             Vec3::new(0., 0., -1.),
+//             Vec3::new(0., 1., 0.),
+//             20.0,
+//             16. / 9.,
+//             1.,
+//             Vec3::new(3., 3., 3.).length(),
+//         ),
+//     }
+// }
+
+pub fn random_scene() -> World {
+    let mut hitable_list: Vec<Box<dyn Hitable + Send + Sync>> = vec![
         Box::new(Sphere {
-            center: Vec3::new(0., -100.5, -1.),
-            radius: 100.,
-            material: Arc::new(Lambertian::new(ConstantTexture(Vec3::new(0.8, 0.8, 0.0)))),
+            center: Vec3::new(0., -1000., 0.),
+            radius: 1000.,
+            material: Arc::new(Lambertian::new(ConstantTexture(Vec3::new(0.5, 0.5, 0.5)))),
         }),
-        // center
         Box::new(Sphere {
-            center: Vec3::new(0., 0., -1.),
-            radius: 0.5,
-            material: Arc::new(Lambertian::new(ConstantTexture(Vec3::new(0.1, 0.2, 0.5)))),
-            // material: Arc::new(Dielectric::new(1.5)),
-        }),
-        //right
-        Box::new(Sphere {
-            center: Vec3::new(-1.0, 0.0, -1.0),
-            radius: 0.5,
-            // material: Arc::new(Metal::new(ConstantTexture(Vec3::new(0.8, 0.8, 0.8)), 0.)),
+            center: Vec3::new(0., 1., 0.),
+            radius: 1.,
             material: Arc::new(Dielectric::new(1.5)),
         }),
-        //left
         Box::new(Sphere {
-            center: Vec3::new(1.0, 0.0, -1.0),
-            radius: 0.5,
-            material: Arc::new(Metal::new(ConstantTexture(Vec3::new(0.8, 0.6, 0.2)), 0.)),
+            center: Vec3::new(-4., 1., 0.),
+            radius: 1.,
+            material: Arc::new(Lambertian::new(ConstantTexture(Vec3::new(0.4, 0.2, 0.1)))),
+        }),
+        Box::new(Sphere {
+            center: Vec3::new(4., 1., 0.),
+            radius: 1.,
+            material: Arc::new(Metal::new(ConstantTexture(Vec3::new(0.7, 0.6, 0.5)), 0.)),
         }),
     ];
+    let mut rng = rand::thread_rng();
+    for a in -11..12 {
+        for b in -11..12 {
+            let choose_mat: f64 = rng.gen();
+            let center = Vec3::new(
+                f64::from(a) + 0.9_f64 * rng.gen::<f64>(),
+                0.2,
+                f64::from(b) + 0.9_f64 * rng.gen::<f64>(),
+            );
+            if (center - Vec3::new(4., 0.2, 0.)).length() > 0.9 {
+                if choose_mat < 0.8 {
+                    // diffuse
+                    let albedo = Vec3::random_in_range(0., 1.);
+                    hitable_list.push(Box::new(Sphere {
+                        center,
+                        radius: 0.2,
+                        material: Arc::new(Lambertian::new(ConstantTexture(albedo))),
+                    }));
+                } else if choose_mat < 0.95 {
+                    // metal
+                    let albedo = Vec3::random_in_range(0.5, 1.);
+                    let fuzz: f64 = rng.gen::<f64>() / 2.;
+                    hitable_list.push(Box::new(Sphere {
+                        center,
+                        radius: 0.2,
+                        material: Arc::new(Metal::new(ConstantTexture(albedo), fuzz)),
+                    }))
+                } else {
+                    // glass
+                    hitable_list.push(Box::new(Sphere {
+                        center,
+                        radius: 0.2,
+                        material: Arc::new(Dielectric::new(1.5)),
+                    }))
+                }
+            }
+        }
+    }
     World {
         hitable_list,
         cam: Camera::new(
-            Vec3::new(3., 3., 2.),
-            Vec3::new(0., 0., -1.),
+            Vec3::new(13., 2., 3.),
+            Vec3::new(0., 0., 0.),
             Vec3::new(0., 1., 0.),
-            20.0,
+            20.,
             16. / 9.,
-            1.,
-            Vec3::new(3., 3., 3.).length(),
+            0.1,
+            10.,
         ),
     }
 }

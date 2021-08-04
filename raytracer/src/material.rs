@@ -15,12 +15,12 @@ pub struct ConstantTexture(pub Vec3);
 pub struct DiffuseLight(pub ConstantTexture);
 
 impl Texture for ConstantTexture {
-    fn get_color(&self, rec: &HitRecord) -> Vec3 {
+    fn get_color(&self, _rec: &HitRecord) -> Vec3 {
         self.0
     }
 }
 impl Texture for DiffuseLight {
-    fn get_color(&self, rec: &HitRecord) -> Vec3 {
+    fn get_color(&self, _rec: &HitRecord) -> Vec3 {
         self.0 .0
     }
 }
@@ -39,7 +39,7 @@ impl<T: Texture> Lambertian<T> {
 }
 
 impl<T: Texture> Material for Lambertian<T> {
-    fn scatter(&self, r: &Ray, rec: &HitRecord) -> Option<(Vec3, Ray)> {
+    fn scatter(&self, _r: &Ray, rec: &HitRecord) -> Option<(Vec3, Ray)> {
         let mut scatter_direction = rec.normal + Vec3::random_unit_vector();
         if scatter_direction.is_near_zero() {
             scatter_direction = rec.normal;
