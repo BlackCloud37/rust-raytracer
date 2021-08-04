@@ -3,6 +3,7 @@ use crate::material::{HitRecord, Hitable};
 use crate::Ray;
 use crate::Vec3;
 use raytracer_codegen::make_spheres_impl;
+use std::f64::consts::PI;
 use std::sync::Arc;
 
 // Call the procedural macro, which will become `make_spheres` function.
@@ -15,7 +16,31 @@ pub struct Camera {
     pub vertical: Vec3,
 }
 
+pub fn degrees_to_radians(degrees: f64) -> f64 {
+    degrees * PI / 180.
+}
+
 impl Camera {
+    pub fn new(look_from: Vec3, look_at: Vec3, vup: Vec3, vfov: f64, aspect_ratio: f64) -> Self {
+        let theta = degrees_to_radians(vfov);
+        let h = f64::tan(theta / 2.);
+        let viewport_height = 2.0 * h;
+        let viewport_width = aspect_ratio * viewport_height;
+
+        let w = (look_from - look_at).unit();
+        let u = Vec3::cross(vup, w).unit();
+        let v = Vec3::cross(w, u);
+
+        let origin = look_from;
+        let horizontal = viewport_width * u;
+        let vertical = viewport_height * v;
+        Self {
+            origin,
+            horizontal,
+            vertical,
+            lower_left_corner: origin - horizontal / 2. - vertical / 2. - w,
+        }
+    }
     pub fn default() -> Self {
         let aspect_ratio = 16. / 9.;
         let viewport_height = 2.;
@@ -149,6 +174,12 @@ pub fn example_scene() -> World {
     ];
     World {
         hitable_list,
-        cam: Camera::default(),
+        cam: Camera::new(
+            Vec3::new(-2., 2., 1.),
+            Vec3::new(0., 0., -1.),
+            Vec3::new(0., 1., 0.),
+            50.0,
+            16. / 9.,
+        ),
     }
 }
