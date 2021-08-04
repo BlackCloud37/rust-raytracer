@@ -1,11 +1,14 @@
-use crate::material::{ConstantTexture, DiffuseLight};
+use crate::material::{ConstantTexture, DiffuseLight, Lambertian, Material, Metal};
 use crate::material::{HitRecord, Hitable};
 use crate::Ray;
 use crate::Vec3;
 use raytracer_codegen::make_spheres_impl;
+use std::borrow::Borrow;
+use std::rc::Rc;
+use std::sync::Arc;
 
 // Call the procedural macro, which will become `make_spheres` function.
-make_spheres_impl! {}
+// make_spheres_impl! {}
 
 pub struct Camera {
     pub origin: Vec3,
@@ -46,7 +49,7 @@ impl Camera {
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f64,
-    pub material: DiffuseLight,
+    pub material: Arc<dyn Material + Send + Sync>,
 }
 
 impl Hitable for Sphere {
@@ -73,14 +76,13 @@ impl Hitable for Sphere {
 
         let p = r.at(root);
         let outward_normal = (p - self.center) / self.radius;
-        let rec = HitRecord::new(root, outward_normal, r);
+        let mut rec = HitRecord::new(root, outward_normal, r, Arc::clone(&self.material));
         Some(rec)
     }
 }
 
 impl Hitable for Vec<Box<dyn Hitable + Send + Sync>> {
     fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
-        let mut closest_so_far = t_max;
         let mut closest_so_far = t_max;
         let mut res = None;
         for object in self {
@@ -105,8 +107,11 @@ impl World {
         }
 
         if let Some(rec) = self.hitable_list.hit(&r, 0.001, f64::INFINITY) {
-            let target = rec.p + rec.normal + Vec3::random_in_unit_sphere();
-            0.5 * self.ray_color(Ray::new(rec.p, target - rec.p), depth - 1)
+            if let Some((attenuation, scattered)) = rec.mat.scatter(&r, &rec) {
+                Vec3::elemul(attenuation, self.ray_color(scattered, depth - 1))
+            } else {
+                Vec3::zero()
+            }
         } else {
             let unit_direction = r.dir.unit();
             let t = 0.5 * unit_direction.y + 1.;
@@ -116,16 +121,26 @@ impl World {
 }
 
 pub fn example_scene() -> World {
-    let mut hitable_list: Vec<Box<dyn Hitable + Send + Sync>> = vec![
+    let hitable_list: Vec<Box<dyn Hitable + Send + Sync>> = vec![
         Box::new(Sphere {
             center: Vec3::new(0., 0., -1.),
             radius: 0.5,
-            material: DiffuseLight(ConstantTexture(Vec3::zero())),
+            material: Arc::new(Lambertian::new(ConstantTexture(Vec3::new(0.7, 0.3, 0.3)))),
         }),
         Box::new(Sphere {
             center: Vec3::new(0., -100.5, -1.),
             radius: 100.,
-            material: DiffuseLight(ConstantTexture(Vec3::zero())),
+            material: Arc::new(Lambertian::new(ConstantTexture(Vec3::new(0.8, 0.8, 0.0)))),
+        }),
+        Box::new(Sphere {
+            center: Vec3::new(-1.0, 0.0, -1.0),
+            radius: 0.5,
+            material: Arc::new(Metal::new(ConstantTexture(Vec3::new(0.8, 0.8, 0.8)), 0.)),
+        }),
+        Box::new(Sphere {
+            center: Vec3::new(1.0, 0.0, -1.0),
+            radius: 0.5,
+            material: Arc::new(Metal::new(ConstantTexture(Vec3::new(0.8, 0.6, 0.2)), 0.)),
         }),
     ];
     World {

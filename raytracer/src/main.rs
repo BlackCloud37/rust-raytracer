@@ -10,7 +10,6 @@ use indicatif::ProgressBar;
 use rand::Rng;
 pub use ray::Ray;
 use scene::example_scene;
-use std::cmp::max;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use threadpool::ThreadPool;

@@ -53,6 +53,10 @@ impl Vec3 {
         }
     }
 
+    pub fn is_near_zero(&self) -> bool {
+        const S: f64 = 1e-8;
+        (self.x.abs() < S) && (self.y.abs() < S) && (self.z.abs() < S)
+    }
     pub fn random() -> Vec3 {
         let mut rng = rand::thread_rng();
         Vec3::new(rng.gen::<f64>(), rng.gen::<f64>(), rng.gen::<f64>())
@@ -72,6 +76,23 @@ impl Vec3 {
             }
             return p;
         }
+    }
+
+    pub fn random_unit_vector() -> Vec3 {
+        Vec3::random_in_unit_sphere().unit()
+    }
+
+    pub fn random_in_hemisphere(normal: &Vec3) -> Vec3 {
+        let in_unit_sphere = Vec3::random_in_unit_sphere();
+        if in_unit_sphere * *normal > 0.0 {
+            in_unit_sphere
+        } else {
+            -in_unit_sphere
+        }
+    }
+
+    pub fn reflect(v_in: Self, norm: Self) -> Self {
+        v_in - 2. * (v_in * norm) * norm
     }
 }
 
