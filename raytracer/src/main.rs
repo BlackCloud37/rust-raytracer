@@ -1,6 +1,7 @@
 #![allow(clippy::float_cmp)]
 
 mod material;
+mod objects;
 mod ray;
 mod scene;
 mod vec3;
@@ -37,8 +38,8 @@ fn main() {
     let width = 1024;
     let height = (width as f64 / aspect_ratio) as u32;
 
-    let max_depth = 50;
-    let samples_per_pixel = 100;
+    let max_depth = 25;
+    let samples_per_pixel = 50;
     // create a channel to send objects between threads
     let (tx, rx) = channel();
     let pool = ThreadPool::new(n_workers);

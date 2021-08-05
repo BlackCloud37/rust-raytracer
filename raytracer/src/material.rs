@@ -1,4 +1,5 @@
 // This file shows necessary examples of how to complete Track 4 and 5.
+use crate::objects::hit::{HitRecord, Hitable};
 use crate::Ray;
 use crate::Vec3;
 use rand::Rng;
@@ -39,13 +40,13 @@ impl<T: Texture> Lambertian<T> {
 }
 
 impl<T: Texture> Material for Lambertian<T> {
-    fn scatter(&self, _r: &Ray, rec: &HitRecord) -> Option<(Vec3, Ray)> {
+    fn scatter(&self, r: &Ray, rec: &HitRecord) -> Option<(Vec3, Ray)> {
         let mut scatter_direction = rec.normal + Vec3::random_unit_vector();
         if scatter_direction.is_near_zero() {
             scatter_direction = rec.normal;
         }
 
-        let scattered = Ray::new(rec.p, scatter_direction);
+        let scattered = Ray::new(rec.p, scatter_direction, r.time);
         let attenutaion = self.albedo.get_color(rec);
         Some((attenutaion, scattered))
     }
@@ -63,7 +64,11 @@ impl<T: Texture> Metal<T> {
 impl<T: Texture> Material for Metal<T> {
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> Option<(Vec3, Ray)> {
         let reflected = Vec3::reflect(r.dir.unit(), rec.normal);
-        let scattered = Ray::new(rec.p, reflected + self.fuzz * Vec3::random_in_unit_sphere());
+        let scattered = Ray::new(
+            rec.p,
+            reflected + self.fuzz * Vec3::random_in_unit_sphere(),
+            r.time,
+        );
         if scattered.dir * rec.normal > 0. {
             let attenuation = self.albedo.get_color(rec);
             Some((attenuation, scattered))
@@ -107,44 +112,10 @@ impl Material for Dielectric {
             } else {
                 Vec3::refract(unit_direction, rec.normal, refraction_ratio)
             };
-        Some((attenuation, Ray::new(rec.p, direction)))
-    }
-}
-pub struct HitRecord {
-    pub p: Vec3,
-    pub normal: Vec3,
-    pub t: f64,
-    pub front_face: bool,
-    pub mat: Arc<dyn Material + Send + Sync>,
-}
-
-impl HitRecord {
-    pub fn new(
-        t: f64,
-        outward_normal: Vec3,
-        r: &Ray,
-        mat: Arc<dyn Material + Send + Sync>,
-    ) -> Self {
-        let p = r.at(t);
-        let front_face = r.dir * outward_normal < 0.;
-        let normal = if front_face {
-            outward_normal
-        } else {
-            -outward_normal
-        };
-        Self {
-            p,
-            normal: normal.unit(),
-            t,
-            front_face,
-            mat,
-        }
+        Some((attenuation, Ray::new(rec.p, direction, r.time)))
     }
 }
 
-pub trait Hitable {
-    fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
-}
 pub struct AABB;
 
 /// This BVHNode should be constructed statically.

@@ -1,13 +1,10 @@
 use crate::material::{ConstantTexture, Dielectric, Lambertian, Material, Metal};
-use crate::material::{HitRecord, Hitable};
-use crate::Ray;
-use crate::Vec3;
+use crate::objects::hit::{HitRecord, Hitable};
+use crate::objects::sphere::{MovingSphere, Sphere};
+use crate::{Ray, Vec3};
 use rand::Rng;
 use std::f64::consts::PI;
 use std::sync::Arc;
-
-// Call the procedural macro, which will become `make_spheres` function.
-// make_spheres_impl! {}
 
 pub struct Camera {
     pub origin: Vec3,
@@ -18,6 +15,8 @@ pub struct Camera {
     pub v: Vec3,
     pub w: Vec3,
     pub lens_radius: f64,
+    pub time0: f64,
+    pub time1: f64,
 }
 
 pub fn degrees_to_radians(degrees: f64) -> f64 {
@@ -33,6 +32,8 @@ impl Camera {
         aspect_ratio: f64,
         aperture: f64,
         focus_dist: f64,
+        time0: f64,
+        time1: f64,
     ) -> Self {
         let theta = degrees_to_radians(vfov);
         let h = f64::tan(theta / 2.);
@@ -55,65 +56,20 @@ impl Camera {
             v,
             w,
             lens_radius: aperture / 2.,
+            time0,
+            time1,
         }
     }
 
     pub fn get_ray(&self, s: f64, t: f64) -> Ray {
         let rd: Vec3 = self.lens_radius * Vec3::random_in_unit_disk();
         let offset: Vec3 = self.u * rd.x + self.v * rd.y;
+        let mut rng = rand::thread_rng();
         Ray::new(
             self.origin + offset,
             self.lower_left_corner + s * self.horizontal + t * self.vertical - self.origin - offset,
+            rng.gen::<f64>() * (self.time1 - self.time0) + self.time0,
         )
-    }
-}
-
-pub struct Sphere {
-    pub center: Vec3,
-    pub radius: f64,
-    pub material: Arc<dyn Material + Send + Sync>,
-}
-
-impl Hitable for Sphere {
-    fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
-        let oc = r.orig - self.center;
-        let a = r.dir.squared_length();
-        let half_b = oc * r.dir;
-        let c = oc.squared_length() - self.radius * self.radius;
-        let discriminant = half_b.powf(2.0) - a * c;
-        if discriminant < 0. {
-            return None;
-        }
-        let sqrt_d = discriminant.sqrt();
-
-        // Find the nearest root that lies in the acceptable range.
-        let in_range = |root| root >= t_min && root <= t_max;
-        let mut root = (-half_b - sqrt_d) / a;
-        if !in_range(root) {
-            root = (-half_b + sqrt_d) / a;
-        }
-        if !in_range(root) {
-            return None;
-        }
-
-        let p = r.at(root);
-        let outward_normal = (p - self.center) / self.radius;
-        let rec = HitRecord::new(root, outward_normal, r, Arc::clone(&self.material));
-        Some(rec)
-    }
-}
-
-impl Hitable for Vec<Box<dyn Hitable + Send + Sync>> {
-    fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
-        let mut closest_so_far = t_max;
-        let mut res = None;
-        for object in self {
-            if let Some(temp_rec) = object.hit(r, t_min, closest_so_far) {
-                closest_so_far = temp_rec.t;
-                res = Some(temp_rec);
-            }
-        }
-        res
     }
 }
 
@@ -141,49 +97,6 @@ impl World {
         }
     }
 }
-
-// pub fn example_scene() -> World {
-//     let hitable_list: Vec<Box<dyn Hitable + Send + Sync>> = vec![
-//         // ground
-//         Box::new(Sphere {
-//             center: Vec3::new(0., -100.5, -1.),
-//             radius: 100.,
-//             material: Arc::new(Lambertian::new(ConstantTexture(Vec3::new(0.8, 0.8, 0.0)))),
-//         }),
-//         // center
-//         Box::new(Sphere {
-//             center: Vec3::new(0., 0., -1.),
-//             radius: 0.5,
-//             material: Arc::new(Lambertian::new(ConstantTexture(Vec3::new(0.1, 0.2, 0.5)))),
-//             // material: Arc::new(Dielectric::new(1.5)),
-//         }),
-//         //right
-//         Box::new(Sphere {
-//             center: Vec3::new(-1.0, 0.0, -1.0),
-//             radius: 0.5,
-//             // material: Arc::new(Metal::new(ConstantTexture(Vec3::new(0.8, 0.8, 0.8)), 0.)),
-//             material: Arc::new(Dielectric::new(1.5)),
-//         }),
-//         //left
-//         Box::new(Sphere {
-//             center: Vec3::new(1.0, 0.0, -1.0),
-//             radius: 0.5,
-//             material: Arc::new(Metal::new(ConstantTexture(Vec3::new(0.8, 0.6, 0.2)), 0.)),
-//         }),
-//     ];
-//     World {
-//         hitable_list,
-//         cam: Camera::new(
-//             Vec3::new(3., 3., 2.),
-//             Vec3::new(0., 0., -1.),
-//             Vec3::new(0., 1., 0.),
-//             20.0,
-//             16. / 9.,
-//             1.,
-//             Vec3::new(3., 3., 3.).length(),
-//         ),
-//     }
-// }
 
 pub fn random_scene() -> World {
     let mut hitable_list: Vec<Box<dyn Hitable + Send + Sync>> = vec![
@@ -221,8 +134,12 @@ pub fn random_scene() -> World {
                 if choose_mat < 0.8 {
                     // diffuse
                     let albedo = Vec3::random_in_range(0., 1.);
-                    hitable_list.push(Box::new(Sphere {
-                        center,
+                    let center1 = center + Vec3::new(0., rng.gen::<f64>() / 2., 0.);
+                    hitable_list.push(Box::new(MovingSphere {
+                        center0: center,
+                        center1,
+                        time0: 0.0,
+                        time1: 1.0,
                         radius: 0.2,
                         material: Arc::new(Lambertian::new(ConstantTexture(albedo))),
                     }));
@@ -256,6 +173,8 @@ pub fn random_scene() -> World {
             16. / 9.,
             0.1,
             10.,
+            0.0,
+            1.0,
         ),
     }
 }
