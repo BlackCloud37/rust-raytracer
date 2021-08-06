@@ -68,7 +68,7 @@ impl Camera {
         Ray::new(
             self.origin + offset,
             self.lower_left_corner + s * self.horizontal + t * self.vertical - self.origin - offset,
-            rng.gen::<f64>() * (self.time1 - self.time0) + self.time0,
+            rng.gen_range(self.time0..self.time1),
         )
     }
 }
@@ -134,7 +134,7 @@ pub fn random_scene() -> World {
                 if choose_mat < 0.8 {
                     // diffuse
                     let albedo = Vec3::random_in_range(0., 1.);
-                    let center1 = center + Vec3::new(0., rng.gen::<f64>() / 2., 0.);
+                    let center1 = center + Vec3::new(0., rng.gen_range(0.0..0.5), 0.);
                     hitable_list.push(Box::new(MovingSphere {
                         center0: center,
                         center1,
@@ -146,7 +146,7 @@ pub fn random_scene() -> World {
                 } else if choose_mat < 0.95 {
                     // metal
                     let albedo = Vec3::random_in_range(0.5, 1.);
-                    let fuzz: f64 = rng.gen::<f64>() / 2.;
+                    let fuzz: f64 = rng.gen_range(0.0..0.5);
                     hitable_list.push(Box::new(Sphere {
                         center,
                         radius: 0.2,

@@ -64,8 +64,11 @@ impl Vec3 {
 
     pub fn random_in_range(min: f64, max: f64) -> Vec3 {
         let mut rng = rand::thread_rng();
-        let remap = |x: f64| x * (max - min) + min;
-        Vec3::new(remap(rng.gen()), remap(rng.gen()), remap(rng.gen()))
+        Vec3::new(
+            rng.gen_range(min..max),
+            rng.gen_range(min..max),
+            rng.gen_range(min..max),
+        )
     }
 
     pub fn random_in_unit_sphere() -> Vec3 {
@@ -93,9 +96,8 @@ impl Vec3 {
 
     pub fn random_in_unit_disk() -> Vec3 {
         let mut rng = rand::thread_rng();
-        let remap = |x: f64| x * 2. - 1.0;
         loop {
-            let p = Vec3::new(remap(rng.gen()), remap(rng.gen()), 0.);
+            let p = Vec3::new(rng.gen_range(-1.0..1.0), rng.gen_range(-1.0..1.0), 0.);
             if p.squared_length() >= 1. {
                 continue;
             }
