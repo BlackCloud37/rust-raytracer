@@ -1,14 +1,13 @@
 // This file shows necessary examples of how to complete Track 4 and 5.
-use crate::objects::hit::{HitRecord, Hitable};
+use crate::objects::hit::HitRecord;
 use crate::Ray;
 use crate::Vec3;
 use rand::Rng;
-use std::sync::Arc;
 
-pub trait Texture {
+pub trait Texture: Send + Sync {
     fn get_color(&self, rec: &HitRecord) -> Vec3;
 }
-pub trait Material {
+pub trait Material: Send + Sync {
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> Option<(Vec3, Ray)>;
 }
 
@@ -113,34 +112,5 @@ impl Material for Dielectric {
                 Vec3::refract(unit_direction, rec.normal, refraction_ratio)
             };
         Some((attenuation, Ray::new(rec.p, direction, r.time)))
-    }
-}
-
-pub struct AABB;
-
-/// This BVHNode should be constructed statically.
-/// You should use procedural macro to generate code like this:
-/// ```
-/// let bvh = BVHNode::construct(
-///     box BVHNode::construct(
-///         box Sphere { .. }
-///         box Sphere { .. }
-///     ),
-///     box BVHNode::construct(
-///         box Sphere { .. }
-///         box Sphere { .. }
-///     )
-/// )
-/// ```
-/// And you can put that `bvh` into your `HittableList`.
-pub struct BVHNode<L: Hitable, R: Hitable> {
-    left: Box<L>,
-    right: Box<R>,
-    bounding_box: AABB,
-}
-
-impl<L: Hitable, R: Hitable> BVHNode<L, R> {
-    pub fn construct(_left: Box<L>, _right: Box<R>) -> Self {
-        unimplemented!()
     }
 }

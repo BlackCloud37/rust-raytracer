@@ -1,6 +1,6 @@
 use image::Rgb;
 use rand::Rng;
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Div, DivAssign, Index, Mul, MulAssign, Neg, Sub, SubAssign};
 
 #[derive(Clone, Debug, PartialEq, Copy)]
 pub struct Vec3 {
@@ -20,6 +20,10 @@ impl Vec3 {
 
     pub fn zero() -> Self {
         Self::new(0.0, 0.0, 0.0)
+    }
+
+    pub fn all(x: f64) -> Self {
+        Self::new(x, x, x)
     }
 
     pub fn squared_length(&self) -> f64 {
@@ -113,6 +117,18 @@ impl Vec3 {
         let r_out_perp: Vec3 = etai_over_etat * (uv + cos_theta * norm);
         let r_out_parallel: Vec3 = -(1.0 - r_out_perp.squared_length()).abs().sqrt() * norm;
         r_out_perp + r_out_parallel
+    }
+}
+
+impl Index<usize> for Vec3 {
+    type Output = f64;
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.x,
+            1 => &self.y,
+            2 => &self.z,
+            _ => panic!(),
+        }
     }
 }
 

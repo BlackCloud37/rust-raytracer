@@ -1,4 +1,5 @@
 use crate::material::Material;
+use crate::objects::aabb::AABB;
 use crate::objects::hit::{HitRecord, Hitable};
 use crate::{Ray, Vec3};
 use std::sync::Arc;
@@ -6,7 +7,7 @@ use std::sync::Arc;
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f64,
-    pub material: Arc<dyn Material + Send + Sync>,
+    pub material: Arc<dyn Material>,
 }
 
 impl Hitable for Sphere {
@@ -36,6 +37,12 @@ impl Hitable for Sphere {
         let rec = HitRecord::new(root, outward_normal, r, Arc::clone(&self.material));
         Some(rec)
     }
+    fn bounding_box(&self, _time0: f64, _time1: f64) -> Option<AABB> {
+        Some(AABB::new(
+            self.center - Vec3::all(self.radius),
+            self.center + Vec3::all(self.radius),
+        ))
+    }
 }
 
 pub struct MovingSphere {
@@ -44,7 +51,7 @@ pub struct MovingSphere {
     pub time0: f64,
     pub time1: f64,
     pub radius: f64,
-    pub material: Arc<dyn Material + Send + Sync>,
+    pub material: Arc<dyn Material>,
 }
 
 impl MovingSphere {
@@ -80,5 +87,16 @@ impl Hitable for MovingSphere {
         let outward_normal = (p - self.center(r.time)) / self.radius;
         let rec = HitRecord::new(root, outward_normal, r, Arc::clone(&self.material));
         Some(rec)
+    }
+    fn bounding_box(&self, time0: f64, time1: f64) -> Option<AABB> {
+        let box0 = AABB::new(
+            self.center(time0) - Vec3::all(self.radius),
+            self.center(time0) + Vec3::all(self.radius),
+        );
+        let box1 = AABB::new(
+            self.center(time1) - Vec3::all(self.radius),
+            self.center(time1) + Vec3::all(self.radius),
+        );
+        Some(AABB::surrounding_box(&box0, &box1))
     }
 }
