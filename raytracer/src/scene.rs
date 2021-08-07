@@ -1,7 +1,7 @@
 use crate::material::{ConstantTexture, Dielectric, Lambertian, Metal};
 use crate::objects::bvh::BVHNode;
 use crate::objects::hit::Hitable;
-use crate::objects::sphere::{MovingSphere, Sphere};
+use crate::objects::sphere::Sphere;
 use crate::{Ray, Vec3};
 use rand::Rng;
 use std::f64::consts::PI;
@@ -144,7 +144,6 @@ pub fn random_scene() -> World {
                 if choose_mat < 0.8 {
                     // diffuse
                     let albedo = Vec3::random_in_range(0., 1.);
-                    let center1 = center + Vec3::new(0., rng.gen_range(0.0..0.5), 0.);
                     hitable_list.push(Arc::new(Sphere {
                         center,
                         radius: 0.2,
