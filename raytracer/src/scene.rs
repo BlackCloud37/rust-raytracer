@@ -1,6 +1,9 @@
-use crate::material::{CheckerTexture, ConstantTexture, Dielectric, Lambertian, Metal};
+use crate::material::{
+    CheckerTexture, ConstantTexture, Dielectric, DiffuseLight, Lambertian, Material, Metal,
+};
 use crate::objects::bvh::BVHNode;
 use crate::objects::hit::Hitable;
+use crate::objects::rectangle::{XYRectangle, XZRectangle, YZRectangle};
 use crate::objects::sphere::Sphere;
 use crate::{Ray, Vec3};
 use rand::Rng;
@@ -95,20 +98,21 @@ impl World {
         }
 
         if let Some(rec) = self.bvh.hit(&r, 0.001, f64::INFINITY) {
+            let emission = rec.mat.emitted(&rec);
             if let Some((attenuation, scattered)) = rec.mat.scatter(&r, &rec) {
-                Vec3::elemul(attenuation, self.ray_color(scattered, depth - 1))
+                emission + Vec3::elemul(attenuation, self.ray_color(scattered, depth - 1))
             } else {
-                Vec3::zero()
+                emission
             }
         } else {
-            let unit_direction = r.dir.unit();
-            let t = 0.5 * unit_direction.y + 1.;
-            (1.0 - t) * Vec3::new(1., 1., 1.) + t * Vec3::new(0.5, 0.7, 1.0)
+            // background color
+            // Vec3::new(0.7, 0.8, 1.0)
+            Vec3::zero()
         }
     }
 }
 
-pub fn random_scene() -> World {
+fn random_scene() -> World {
     let mut hitable_list: Vec<Arc<dyn Hitable>> = vec![
         Arc::new(Sphere {
             center: Vec3::new(0., -1000., 0.),
@@ -126,7 +130,7 @@ pub fn random_scene() -> World {
         Arc::new(Sphere {
             center: Vec3::new(-4., 1., 0.),
             radius: 1.,
-            material: Arc::new(Lambertian::new(ConstantTexture(Vec3::new(0.4, 0.2, 0.1)))),
+            material: Arc::new(DiffuseLight::new(ConstantTexture(Vec3::new(4., 4., 4.)))),
         }),
         Arc::new(Sphere {
             center: Vec3::new(4., 1., 0.),
@@ -179,9 +183,81 @@ pub fn random_scene() -> World {
             Vec3::new(0., 1., 0.),
             20.,
             16. / 9.,
-            0.1,
-            10.,
+            0.0,
+            10.0,
             (0.0, 1.0),
         ),
     )
+}
+
+fn cornell_box_scene() -> World {
+    let red: Arc<dyn Material> = Arc::new(Lambertian::new(ConstantTexture(Vec3::new(
+        0.65, 0.05, 0.05,
+    ))));
+    let white: Arc<dyn Material> = Arc::new(Lambertian::new(ConstantTexture(Vec3::new(
+        0.73, 0.73, 0.73,
+    ))));
+    let green: Arc<dyn Material> = Arc::new(Lambertian::new(ConstantTexture(Vec3::new(
+        0.12, 0.45, 0.15,
+    ))));
+    let light: Arc<dyn Material> =
+        Arc::new(DiffuseLight::new(ConstantTexture(Vec3::new(15., 15., 15.))));
+    let hitable_list: Vec<Arc<dyn Hitable>> = vec![
+        Arc::new(YZRectangle {
+            yz0: (0.0, 0.0),
+            yz1: (555.0, 555.0),
+            x: 555.,
+            material: Arc::clone(&green),
+        }),
+        Arc::new(YZRectangle {
+            yz0: (0., 0.),
+            yz1: (555., 555.),
+            x: 0.,
+            material: Arc::clone(&red),
+        }),
+        Arc::new(XZRectangle {
+            xz0: (213., 227.),
+            xz1: (343., 332.),
+            y: 554.,
+            material: Arc::clone(&light),
+        }),
+        Arc::new(XZRectangle {
+            xz0: (0., 0.),
+            xz1: (555., 555.),
+            y: 0.,
+            material: Arc::clone(&white),
+        }),
+        Arc::new(XZRectangle {
+            xz0: (0., 0.),
+            xz1: (555., 555.),
+            y: 555.,
+            material: Arc::clone(&white),
+        }),
+        Arc::new(XYRectangle {
+            xy0: (0., 0.),
+            xy1: (555., 555.),
+            z: 555.,
+            material: Arc::clone(&white),
+        }),
+    ];
+
+    World::new(
+        hitable_list,
+        Camera::new(
+            (Vec3::new(278., 278., -800.), Vec3::new(278., 278., 278.)),
+            Vec3::new(0., 1., 0.),
+            40.,
+            16. / 9.,
+            0.0,
+            10.0,
+            (0.0, 1.0),
+        ),
+    )
+}
+
+pub fn select_scene(index: usize) -> World {
+    match index {
+        0 => cornell_box_scene(),
+        _ => random_scene(),
+    }
 }

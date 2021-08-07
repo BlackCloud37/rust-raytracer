@@ -9,10 +9,12 @@ pub trait Texture: Send + Sync {
 }
 pub trait Material: Send + Sync {
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> Option<(Vec3, Ray)>;
+    fn emitted(&self, _rec: &HitRecord) -> Vec3 {
+        Vec3::zero()
+    }
 }
 
 pub struct ConstantTexture(pub Vec3);
-pub struct DiffuseLight(pub ConstantTexture);
 pub struct CheckerTexture(pub ConstantTexture, pub ConstantTexture);
 
 impl Texture for ConstantTexture {
@@ -30,12 +32,6 @@ impl Texture for CheckerTexture {
         } else {
             self.1.get_color(rec)
         }
-    }
-}
-
-impl Texture for DiffuseLight {
-    fn get_color(&self, _rec: &HitRecord) -> Vec3 {
-        self.0 .0
     }
 }
 
@@ -126,5 +122,24 @@ impl Material for Dielectric {
                 Vec3::refract(unit_direction, rec.normal, refraction_ratio)
             };
         Some((attenuation, Ray::new(rec.p, direction, r.time)))
+    }
+}
+
+pub struct DiffuseLight<T: Texture> {
+    pub emit: T,
+}
+
+impl<T: Texture> DiffuseLight<T> {
+    pub fn new(emit: T) -> Self {
+        Self { emit }
+    }
+}
+
+impl<T: Texture> Material for DiffuseLight<T> {
+    fn scatter(&self, _r: &Ray, _rec: &HitRecord) -> Option<(Vec3, Ray)> {
+        None
+    }
+    fn emitted(&self, rec: &HitRecord) -> Vec3 {
+        self.emit.get_color(rec)
     }
 }

@@ -10,7 +10,7 @@ use image::{ImageBuffer, Rgb, RgbImage};
 use indicatif::ProgressBar;
 use rand::Rng;
 pub use ray::Ray;
-use scene::random_scene;
+use scene::select_scene;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use threadpool::ThreadPool;
@@ -47,7 +47,7 @@ fn main() {
     let bar = ProgressBar::new(n_jobs as u64);
 
     // use Arc to pass one instance of World to multiple threads
-    let world = Arc::new(random_scene());
+    let world = Arc::new(select_scene(0));
 
     for i in 0..n_jobs {
         let tx = tx.clone();
