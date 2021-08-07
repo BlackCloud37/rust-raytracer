@@ -13,12 +13,26 @@ pub trait Material: Send + Sync {
 
 pub struct ConstantTexture(pub Vec3);
 pub struct DiffuseLight(pub ConstantTexture);
+pub struct CheckerTexture(pub ConstantTexture, pub ConstantTexture);
 
 impl Texture for ConstantTexture {
     fn get_color(&self, _rec: &HitRecord) -> Vec3 {
         self.0
     }
 }
+
+impl Texture for CheckerTexture {
+    fn get_color(&self, rec: &HitRecord) -> Vec3 {
+        let p = rec.p;
+        let sines = f64::sin(10. * p.x) * f64::sin(10. * p.y) * f64::sin(10. * p.z);
+        if sines < 0. {
+            self.0.get_color(rec)
+        } else {
+            self.1.get_color(rec)
+        }
+    }
+}
+
 impl Texture for DiffuseLight {
     fn get_color(&self, _rec: &HitRecord) -> Vec3 {
         self.0 .0

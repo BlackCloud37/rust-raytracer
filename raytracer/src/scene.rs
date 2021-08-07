@@ -1,4 +1,4 @@
-use crate::material::{ConstantTexture, Dielectric, Lambertian, Metal};
+use crate::material::{CheckerTexture, ConstantTexture, Dielectric, Lambertian, Metal};
 use crate::objects::bvh::BVHNode;
 use crate::objects::hit::Hitable;
 use crate::objects::sphere::Sphere;
@@ -113,7 +113,10 @@ pub fn random_scene() -> World {
         Arc::new(Sphere {
             center: Vec3::new(0., -1000., 0.),
             radius: 1000.,
-            material: Arc::new(Lambertian::new(ConstantTexture(Vec3::new(0.5, 0.5, 0.5)))),
+            material: Arc::new(Lambertian::new(CheckerTexture(
+                ConstantTexture(Vec3::new(0.2, 0.3, 0.1)),
+                ConstantTexture(Vec3::new(0.9, 0.9, 0.9)),
+            ))),
         }),
         Arc::new(Sphere {
             center: Vec3::new(0., 1., 0.),
