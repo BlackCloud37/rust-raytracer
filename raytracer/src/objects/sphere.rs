@@ -48,7 +48,7 @@ impl Hitable for Sphere {
             outward_normal,
             r,
             Arc::clone(&self.material),
-            self.get_uv(&p),
+            self.get_uv(&outward_normal),
         );
         Some(rec)
     }

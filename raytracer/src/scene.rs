@@ -1,5 +1,6 @@
 use crate::material::{
-    CheckerTexture, ConstantTexture, Dielectric, DiffuseLight, Lambertian, Material, Metal,
+    CheckerTexture, ConstantTexture, Dielectric, DiffuseLight, ImageTexture, Lambertian, Material,
+    Metal,
 };
 use crate::objects::bvh::BVHNode;
 use crate::objects::hit::Hitable;
@@ -106,13 +107,23 @@ impl World {
             }
         } else {
             // background color
-            // Vec3::new(0.7, 0.8, 1.0)
-            Vec3::zero()
+            Vec3::new(0.7, 0.8, 1.0)
+            // Vec3::zero()
         }
     }
 }
 
 fn random_scene() -> World {
+    use image::io::Reader as ImageReader;
+    let res = ImageReader::open("texture/earthmap.jpg");
+    if res.is_err() {
+        panic!("Err reading texture")
+    }
+    let decode_res = res.unwrap().decode();
+    if decode_res.is_err() {
+        panic!("Err reading texture")
+    }
+    let img = decode_res.unwrap();
     let mut hitable_list: Vec<Arc<dyn Hitable>> = vec![
         Arc::new(Sphere {
             center: Vec3::new(0., -1000., 0.),
@@ -125,7 +136,7 @@ fn random_scene() -> World {
         Arc::new(Sphere {
             center: Vec3::new(0., 1., 0.),
             radius: 1.,
-            material: Arc::new(Dielectric::new(1.5)),
+            material: Arc::new(Lambertian::new(ImageTexture(img))),
         }),
         Arc::new(Sphere {
             center: Vec3::new(-4., 1., 0.),

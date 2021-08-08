@@ -2,6 +2,7 @@
 use crate::objects::hit::HitRecord;
 use crate::Ray;
 use crate::Vec3;
+use image::{DynamicImage, GenericImageView};
 use rand::Rng;
 
 pub trait Texture: Send + Sync {
@@ -16,6 +17,7 @@ pub trait Material: Send + Sync {
 
 pub struct ConstantTexture(pub Vec3);
 pub struct CheckerTexture(pub ConstantTexture, pub ConstantTexture);
+pub struct ImageTexture(pub DynamicImage);
 
 impl Texture for ConstantTexture {
     fn get_color(&self, _rec: &HitRecord) -> Vec3 {
@@ -32,6 +34,22 @@ impl Texture for CheckerTexture {
         } else {
             self.1.get_color(rec)
         }
+    }
+}
+
+impl Texture for ImageTexture {
+    fn get_color(&self, rec: &HitRecord) -> Vec3 {
+        let image = &self.0;
+        let (u, v) = rec.uv;
+        let (u, v) = (u.clamp(0., 1.), 1. - v.clamp(0., 1.));
+        let (width, height) = (image.width(), image.height());
+        let (x, y) = (
+            (width as f64 * u).floor() as u32,
+            (height as f64 * v).floor() as u32,
+        );
+
+        let rgb = image.get_pixel(x, y);
+        Vec3::from(rgb)
     }
 }
 

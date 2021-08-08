@@ -1,4 +1,4 @@
-use image::Rgb;
+use image::{Rgb, Rgba};
 use rand::Rng;
 use std::ops::{Add, AddAssign, Div, DivAssign, Index, Mul, MulAssign, Neg, Sub, SubAssign};
 
@@ -139,6 +139,20 @@ impl From<Vec3> for Rgb<u8> {
             (item.y.sqrt().clamp(0., 1.) * 255.).floor() as u8,
             (item.z.sqrt().clamp(0., 1.) * 255.).floor() as u8,
         ])
+    }
+}
+
+impl From<Rgb<u8>> for Vec3 {
+    fn from(item: Rgb<u8>) -> Self {
+        let [r, g, b] = item.0;
+        Vec3::new(r as f64 / 255., g as f64 / 255., b as f64 / 255.)
+    }
+}
+
+impl From<Rgba<u8>> for Vec3 {
+    fn from(item: Rgba<u8>) -> Self {
+        let [r, g, b, _] = item.0;
+        Vec3::new(r as f64 / 255., g as f64 / 255., b as f64 / 255.)
     }
 }
 
