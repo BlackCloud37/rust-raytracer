@@ -1,4 +1,5 @@
 use image::{Rgb, Rgba};
+use nalgebra::{Matrix4, Matrix4x1};
 use rand::Rng;
 use std::ops::{Add, AddAssign, Div, DivAssign, Index, Mul, MulAssign, Neg, Sub, SubAssign};
 
@@ -24,6 +25,18 @@ impl Vec3 {
 
     pub fn all(x: f64) -> Self {
         Self::new(x, x, x)
+    }
+
+    pub fn xy(&self) -> (f64, f64) {
+        (self.x, self.y)
+    }
+
+    pub fn xz(&self) -> (f64, f64) {
+        (self.x, self.z)
+    }
+
+    pub fn yz(&self) -> (f64, f64) {
+        (self.y, self.z)
     }
 
     pub fn squared_length(&self) -> f64 {
@@ -118,7 +131,28 @@ impl Vec3 {
         let r_out_parallel: Vec3 = -(1.0 - r_out_perp.squared_length()).abs().sqrt() * norm;
         r_out_perp + r_out_parallel
     }
+
+    pub fn transform_point(&self, trans: &Matrix4<f64>) -> Self {
+        let in_vec = Matrix4x1::new(self.x, self.y, self.z, 1.);
+        let out_vec = trans * in_vec;
+        Vec3::new(out_vec[(0, 0)], out_vec[(1, 0)], out_vec[(2, 0)])
+    }
+
+    pub fn transform_dir(&self, trans: &Matrix4<f64>) -> Self {
+        let in_vec = Matrix4x1::new(self.x, self.y, self.z, 0.);
+        let out_vec = trans * in_vec;
+        Vec3::new(out_vec[(0, 0)], out_vec[(1, 0)], out_vec[(2, 0)])
+    }
 }
+
+// impl Mul<Vec3> for Matrix4<f64> {
+//     type Output = Vec3;
+//     fn mul(self, rhs: Vec3) -> Self::Output {
+//         let in_vec = Matrix4x1::new(rhs.x, rhs.y, rhs.z, 1.);
+//         let out_vec = self * in_vec;
+//         Vec3::new()
+//     }
+// }
 
 impl Index<usize> for Vec3 {
     type Output = f64;

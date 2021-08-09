@@ -47,7 +47,7 @@ fn main() {
     let bar = ProgressBar::new(n_jobs as u64);
 
     // use Arc to pass one instance of World to multiple threads
-    let world = Arc::new(select_scene(1));
+    let world = Arc::new(select_scene(0));
 
     for i in 0..n_jobs {
         let tx = tx.clone();

@@ -3,9 +3,11 @@ use crate::material::{
     Metal,
 };
 use crate::objects::bvh::BVHNode;
+use crate::objects::cube::Cube;
 use crate::objects::hit::Hitable;
 use crate::objects::rectangle::{XYRectangle, XZRectangle, YZRectangle};
 use crate::objects::sphere::Sphere;
+use crate::objects::transform::Transform;
 use crate::{Ray, Vec3};
 use rand::Rng;
 use std::f64::consts::PI;
@@ -107,8 +109,8 @@ impl World {
             }
         } else {
             // background color
-            Vec3::new(0.7, 0.8, 1.0)
-            // Vec3::zero()
+            // Vec3::new(0.7, 0.8, 1.0)
+            Vec3::zero()
         }
     }
 }
@@ -250,6 +252,26 @@ fn cornell_box_scene() -> World {
             z: 555.,
             material: Arc::clone(&white),
         }),
+        Arc::new(Transform::new(
+            Vec3::new(0., 15., 0.),
+            Vec3::new(1.1, 0.6, 1.1),
+            Vec3::new(265., 0., 295.),
+            Arc::new(Cube::new(
+                Vec3::new(0., 0., 0.),
+                Vec3::new(165., 330., 165.),
+                Arc::clone(&white),
+            )),
+        )),
+        Arc::new(Transform::new(
+            Vec3::new(0., -18., 0.),
+            Vec3::ones(),
+            Vec3::new(130., 0., 65.),
+            Arc::new(Cube::new(
+                Vec3::new(0., 0., 0.),
+                Vec3::new(165., 165., 165.),
+                Arc::clone(&white),
+            )),
+        )),
     ];
 
     World::new(

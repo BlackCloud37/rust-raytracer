@@ -14,3 +14,4 @@ rusttype = "0.9"
 threadpool = "1.8"
 raytracer_codegen = { path = "../raytracer_codegen" }
 rand = "0.8.4"
+nalgebra = "0.28.0"
