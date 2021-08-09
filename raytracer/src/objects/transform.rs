@@ -113,11 +113,13 @@ impl Transform {
                 for j in 0..2 {
                     for k in 0..2 {
                         let (i, j, k) = (i as f64, j as f64, k as f64);
-                        let x = i * bbox.maximum.x + (1. - i) * bbox.minimum.x;
-                        let y = j * bbox.maximum.y + (1. - j) * bbox.minimum.y;
-                        let z = k * bbox.maximum.z + (1. - k) * bbox.minimum.z;
+                        let tester = Vec3::new(
+                            i * bbox.maximum.x + (1. - i) * bbox.minimum.x,
+                            j * bbox.maximum.y + (1. - j) * bbox.minimum.y,
+                            k * bbox.maximum.z + (1. - k) * bbox.minimum.z,
+                        )
+                        .transform_point(&trans);
 
-                        let tester = Vec3::new(x, y, z).transform_point(&trans);
                         for c in 0..3 {
                             min[c] = min[c].min(tester[c]);
                             max[c] = max[c].max(tester[c]);

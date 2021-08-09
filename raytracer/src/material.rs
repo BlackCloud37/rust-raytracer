@@ -161,3 +161,22 @@ impl<T: Texture> Material for DiffuseLight<T> {
         self.emit.get_color(rec)
     }
 }
+
+pub struct Isotropic<T: Texture> {
+    pub albedo: T,
+}
+
+impl<T: Texture> Isotropic<T> {
+    pub fn new(albedo: T) -> Self {
+        Self { albedo }
+    }
+}
+
+impl<T: Texture> Material for Isotropic<T> {
+    fn scatter(&self, r: &Ray, rec: &HitRecord) -> Option<(Vec3, Ray)> {
+        Some((
+            self.albedo.get_color(rec),
+            Ray::new(rec.p, Vec3::random_in_unit_sphere(), r.time),
+        ))
+    }
+}

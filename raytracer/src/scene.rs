@@ -1,10 +1,11 @@
 use crate::material::{
-    CheckerTexture, ConstantTexture, Dielectric, DiffuseLight, ImageTexture, Lambertian, Material,
-    Metal,
+    CheckerTexture, ConstantTexture, Dielectric, DiffuseLight, ImageTexture, Isotropic, Lambertian,
+    Material, Metal,
 };
 use crate::objects::bvh::BVHNode;
 use crate::objects::cube::Cube;
 use crate::objects::hit::Hitable;
+use crate::objects::medium::ConstantMedium;
 use crate::objects::rectangle::{XYRectangle, XZRectangle, YZRectangle};
 use crate::objects::sphere::Sphere;
 use crate::objects::transform::Transform;
@@ -214,7 +215,7 @@ fn cornell_box_scene() -> World {
         0.12, 0.45, 0.15,
     ))));
     let light: Arc<dyn Material> =
-        Arc::new(DiffuseLight::new(ConstantTexture(Vec3::new(15., 15., 15.))));
+        Arc::new(DiffuseLight::new(ConstantTexture(Vec3::new(7., 7., 7.))));
     let hitable_list: Vec<Arc<dyn Hitable>> = vec![
         Arc::new(YZRectangle {
             yz0: (0.0, 0.0),
@@ -229,8 +230,8 @@ fn cornell_box_scene() -> World {
             material: Arc::clone(&red),
         }),
         Arc::new(XZRectangle {
-            xz0: (213., 227.),
-            xz1: (343., 332.),
+            xz0: (113., 127.),
+            xz1: (443., 432.),
             y: 554.,
             material: Arc::clone(&light),
         }),
@@ -252,25 +253,33 @@ fn cornell_box_scene() -> World {
             z: 555.,
             material: Arc::clone(&white),
         }),
-        Arc::new(Transform::new(
-            Vec3::new(0., 15., 0.),
-            Vec3::new(1.1, 0.6, 1.1),
-            Vec3::new(265., 0., 295.),
-            Arc::new(Cube::new(
-                Vec3::new(0., 0., 0.),
-                Vec3::new(165., 330., 165.),
-                Arc::clone(&white),
+        Arc::new(ConstantMedium::new(
+            0.01,
+            Arc::new(Transform::new(
+                Vec3::new(0., 15., 0.),
+                Vec3::ones(),
+                Vec3::new(265., 0., 295.),
+                Arc::new(Cube::new(
+                    Vec3::new(0., 0., 0.),
+                    Vec3::new(165., 330., 165.),
+                    Arc::clone(&white),
+                )),
             )),
+            Arc::new(Isotropic::new(ConstantTexture(Vec3::zero()))),
         )),
-        Arc::new(Transform::new(
-            Vec3::new(0., -18., 0.),
-            Vec3::ones(),
-            Vec3::new(130., 0., 65.),
-            Arc::new(Cube::new(
-                Vec3::new(0., 0., 0.),
-                Vec3::new(165., 165., 165.),
-                Arc::clone(&white),
+        Arc::new(ConstantMedium::new(
+            0.01,
+            Arc::new(Transform::new(
+                Vec3::new(0., -18., 0.),
+                Vec3::ones(),
+                Vec3::new(130., 0., 65.),
+                Arc::new(Cube::new(
+                    Vec3::new(0., 0., 0.),
+                    Vec3::new(165., 165., 165.),
+                    Arc::clone(&white),
+                )),
             )),
+            Arc::new(Isotropic::new(ConstantTexture(Vec3::ones()))),
         )),
     ];
 
