@@ -1,5 +1,6 @@
 #![allow(clippy::float_cmp)]
 
+mod light;
 mod material;
 mod objects;
 mod ray;
@@ -39,7 +40,7 @@ fn main() {
     let height = (width as f64 / aspect_ratio) as u32;
 
     let max_depth = 40;
-    let samples_per_pixel = 100;
+    let samples_per_pixel = 4;
     // create a channel to send objects between threads
     let (tx, rx) = channel();
     let pool = ThreadPool::new(n_workers);
@@ -47,7 +48,9 @@ fn main() {
     let bar = ProgressBar::new(n_jobs as u64);
 
     // use Arc to pass one instance of World to multiple threads
-    let world = Arc::new(select_scene(0));
+    let mut world = select_scene(0);
+    world.map_photons();
+    let world = Arc::new(world);
 
     for i in 0..n_jobs {
         let tx = tx.clone();
@@ -69,7 +72,7 @@ fn main() {
                         let u = (x as f64 + rng.gen::<f64>()) / (width - 1) as f64;
                         let v = (y as f64 + rng.gen::<f64>()) / (height - 1) as f64;
                         let r = world_ptr.cam.get_ray(u, 1.0 - v); // y axis is reverted
-                        pixel_color += world_ptr.ray_color(r, max_depth);
+                        pixel_color += world_ptr.ray_color_pm(r, max_depth);
                     }
                     pixel_color /= samples_per_pixel as f64;
                     let pixel = img.get_pixel_mut(x, img_y as u32);

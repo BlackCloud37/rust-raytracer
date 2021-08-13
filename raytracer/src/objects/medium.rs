@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::material::Material;
 use crate::objects::aabb::AABB;
 use crate::objects::hit::{HitRecord, Hitable};

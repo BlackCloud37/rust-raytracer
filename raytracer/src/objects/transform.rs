@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::objects::aabb::AABB;
 use crate::objects::hit::{HitRecord, Hitable};
 use crate::scene::degrees_to_radians;

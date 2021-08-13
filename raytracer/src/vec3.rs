@@ -1,6 +1,8 @@
+use cached::proc_macro::cached;
 use image::{Rgb, Rgba};
 use nalgebra::{Matrix4, Matrix4x1};
-use rand::Rng;
+use rand::{thread_rng, Rng};
+use std::f64::consts::PI;
 use std::ops::{Add, AddAssign, Div, DivAssign, Index, Mul, MulAssign, Neg, Sub, SubAssign};
 
 #[derive(Clone, Debug, PartialEq, Copy)]
@@ -37,6 +39,14 @@ impl Vec3 {
 
     pub fn yz(&self) -> (f64, f64) {
         (self.y, self.z)
+    }
+
+    pub fn xyz(&self) -> (f64, f64, f64) {
+        (self.x, self.y, self.z)
+    }
+
+    pub fn max(&self) -> f64 {
+        self.x.max(self.y).max(self.z)
     }
 
     pub fn squared_length(&self) -> f64 {
@@ -89,13 +99,21 @@ impl Vec3 {
     }
 
     pub fn random_in_unit_sphere() -> Vec3 {
-        loop {
-            let p = Vec3::random_in_range(-1., 1.);
-            if p.squared_length() >= 1. {
-                continue;
-            }
-            return p;
-        }
+        let mut rng = thread_rng();
+        let theta: f64 = rng.gen::<f64>() * 2. * PI;
+        let phi = f64::acos(rng.gen::<f64>() * 2. - 1.);
+        Vec3::new(
+            f64::cos(theta) * f64::sin(phi),
+            f64::sin(theta) * f64::sin(phi),
+            f64::cos(phi),
+        )
+        // loop {
+        //     let p = Vec3::random_in_range(-1., 1.);
+        //     if p.squared_length() >= 1. {
+        //         continue;
+        //     }
+        //     return p;
+        // }
     }
 
     pub fn random_unit_vector() -> Vec3 {
@@ -145,6 +163,17 @@ impl Vec3 {
     }
 }
 
+#[cached]
+pub fn polar_direction(theta: u8, phi: u8) -> Vec3 {
+    let theta = theta as f64 / 255.;
+    let phi = phi as f64 / 255.;
+
+    Vec3::new(
+        f64::cos(theta) * f64::sin(phi),
+        f64::sin(theta) * f64::sin(phi),
+        f64::cos(phi),
+    )
+}
 // impl Mul<Vec3> for Matrix4<f64> {
 //     type Output = Vec3;
 //     fn mul(self, rhs: Vec3) -> Self::Output {

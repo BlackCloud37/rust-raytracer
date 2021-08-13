@@ -15,3 +15,6 @@ threadpool = "1.8"
 raytracer_codegen = { path = "../raytracer_codegen" }
 rand = "0.8.4"
 nalgebra = "0.28.0"
+kd-tree = "0.4.1"
+typenum = "1.13.0"
+cached = "0.24.1"
