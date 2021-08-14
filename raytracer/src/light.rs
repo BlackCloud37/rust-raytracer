@@ -46,8 +46,9 @@ impl KdPoint for Photon {
     }
 }
 
-pub trait Light {
+pub trait Light: Sync + Send {
     fn emit(&self) -> (Ray, Vec3); // ray, power
+    fn power(&self) -> Vec3;
 }
 
 pub struct SphereLight {
@@ -62,5 +63,8 @@ impl Light for SphereLight {
             Ray::new(self.position, Vec3::random_in_unit_sphere(), 0.),
             self.flux * self.scale,
         )
+    }
+    fn power(&self) -> Vec3 {
+        self.scale * self.flux
     }
 }

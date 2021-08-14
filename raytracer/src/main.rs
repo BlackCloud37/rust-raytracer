@@ -36,11 +36,11 @@ fn main() {
 
     // Image
     let aspect_ratio = 16. / 9.;
-    let width = 1024;
+    let width = 800;
     let height = (width as f64 / aspect_ratio) as u32;
 
     let max_depth = 40;
-    let samples_per_pixel = 4;
+    let samples_per_pixel = 8;
     // create a channel to send objects between threads
     let (tx, rx) = channel();
     let pool = ThreadPool::new(n_workers);

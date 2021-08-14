@@ -13,6 +13,8 @@ use rand::Rng;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
+const N_PHOTONS: usize = 20000000;
+const N_NEAREST: usize = 1000;
 pub struct Camera {
     pub origin: Vec3,
     pub lower_left_corner: Vec3,
@@ -84,66 +86,110 @@ pub struct World {
     // pub hitable_list: Vec<Arc<dyn Hitable>>,
     pub bvh: BVHNode,
     pub cam: Camera,
-    pub photon_map: KdTreeN<Photon, typenum::U3>,
+    pub lights: Vec<Arc<dyn Light>>,
+    pub global_pm: KdTreeN<Photon, typenum::U3>,
+    pub caustic_pm: KdTreeN<Photon, typenum::U3>,
+    // pub volume_pm
 }
 
 impl World {
-    pub fn new(hitable_list: Vec<Arc<dyn Hitable>>, cam: Camera) -> Self {
+    pub fn new(
+        hitable_list: Vec<Arc<dyn Hitable>>,
+        cam: Camera,
+        lights: Vec<Arc<dyn Light>>,
+    ) -> Self {
         Self {
             bvh: BVHNode::new(hitable_list, 0.0, 1.0),
             cam,
-            photon_map: KdTreeN::default(),
+            lights,
+            global_pm: KdTreeN::default(),
+            caustic_pm: KdTreeN::default(),
         }
     }
 
     pub fn map_photons(&mut self) {
-        // single light
-        let light = SphereLight {
-            position: Vec3::new(250., 500., 250.),
-            flux: Vec3::new(1., 1., 1.),
-            scale: 200000.,
-        };
-
         let mut all_photons = vec![];
+        let mut caustic_photons = vec![];
+        let tot_power = self.lights.iter().map(|l| l.power()).reduce(|a, b| a + b);
+        if let Some(tot_power) = tot_power {
+            for light in self.lights.iter() {
+                let n_emit =
+                    (N_PHOTONS as f64 * (light.power().length() / tot_power.length())) as usize;
+                for _ in 0..n_emit {
+                    // trace photon
+                    let (mut ray, mut power) = light.emit();
+                    while let Some(rec) = self.bvh.hit(&ray, 0.0001, f64::INFINITY) {
+                        // hit sth., record if diffuse and update power/ray
+                        let (interaction, out_ray, new_power) =
+                            rec.mat.scatter_photon(&ray, &rec, power);
+                        match interaction {
+                            Interaction::Diffuse => {
+                                all_photons.push(Photon::new(rec.p, power, ray.dir));
+                            }
+                            Interaction::Absorb => {
+                                break;
+                            }
+                            _ => {}
+                        }
+                        if let (Some(out_ray), Some(new_power)) = (out_ray, new_power) {
+                            ray = out_ray;
+                            power = new_power;
+                        }
+                    }
 
-        let n_emitted_photons = 1000000;
-        // todo!(multi light source)
-        for _ in 0..n_emitted_photons {
-            let (mut ray, mut power) = light.emit();
-            // trace photon
-            while let Some(rec) = self.bvh.hit(&ray, 0.0001, f64::INFINITY) {
-                // hit sth., record if diffuse and update power/ray
-                let (interaction, out_ray, new_power) = rec.mat.scatter_photon(&ray, &rec, power);
-                match interaction {
-                    Interaction::Diffuse => {
-                        all_photons.push(Photon::new(ray.orig, power, ray.dir));
+                    // caustic
+                    let (mut ray, mut power) = light.emit();
+                    let mut has_specular_or_glossy = false;
+                    while let Some(rec) = self.bvh.hit(&ray, 0.0001, f64::INFINITY) {
+                        // hit sth., record if diffuse and update power/ray
+                        let (interaction, out_ray, new_power) =
+                            rec.mat.scatter_photon(&ray, &rec, power);
+                        match interaction {
+                            Interaction::Diffuse => {
+                                if has_specular_or_glossy {
+                                    caustic_photons.push(Photon::new(ray.orig, power, ray.dir));
+                                }
+                                break;
+                            }
+                            Interaction::Absorb => {
+                                break;
+                            }
+                            _ => {
+                                has_specular_or_glossy = true;
+                            }
+                        }
+                        if let (Some(out_ray), Some(new_power)) = (out_ray, new_power) {
+                            ray = out_ray;
+                            power = new_power;
+                        }
                     }
-                    Interaction::Absorb => {
-                        break;
-                    }
-                    _ => {}
-                }
-                if let (Some(out_ray), Some(new_power)) = (out_ray, new_power) {
-                    ray = out_ray;
-                    power = new_power;
                 }
             }
         }
+
         // build kd tree
-        self.photon_map = kd_tree::KdTree::build_by_ordered_float(all_photons);
+        self.global_pm = kd_tree::KdTree::build_by_ordered_float(all_photons);
+        self.caustic_pm = kd_tree::KdTree::build_by_ordered_float(caustic_photons);
     }
 
     pub fn ray_color_pm(&self, r: Ray, depth: i32) -> Vec3 {
+        let debug_render_pm = false;
         if depth <= 0 {
             return Vec3::zero();
         }
-
         if let Some(rec) = self.bvh.hit(&r, 0.001, f64::INFINITY) {
             let emission = rec.mat.emitted(&rec);
+            if debug_render_pm {
+                let (x, y, z) = rec.p.xyz();
+                let within_global = self.global_pm.within_radius(&[x, y, z], 3.);
+                let within_caustic = self.caustic_pm.within_radius(&[x, y, z], 3.);
+                return Vec3::new(1., 0., 0.) * (within_global.len() as f64 / N_NEAREST as f64)
+                    + Vec3::new(0., 1., 0.) * (within_caustic.len() as f64 / N_NEAREST as f64);
+            }
             return match rec.mat.scatter(&r, &rec) {
                 (Interaction::Diffuse, _, _) => {
                     let (x, y, z) = rec.p.xyz();
-                    let nearest = self.photon_map.nearests(&[x, y, z], 50);
+                    let nearest = self.global_pm.nearests(&[x, y, z], N_NEAREST);
                     let mut flux = Vec3::zero();
                     let mut radius2: f64 = 0.;
                     for kd_tree::ItemAndDistance {
@@ -151,7 +197,6 @@ impl World {
                         squared_distance,
                     } in nearest.into_iter()
                     {
-                        // let photon = ;
                         radius2 = radius2.max(squared_distance);
                         if let (_, _, Some(f)) = rec.mat.scatter(
                             &Ray::new(photon.position(), photon.direction(), r.time),
@@ -160,7 +205,7 @@ impl World {
                             flux += Vec3::elemul(f, photon.power());
                         }
                     }
-                    emission + flux / (PI * radius2 * 100000.)
+                    emission + flux / (PI * radius2 * N_PHOTONS as f64)
                 }
                 (_, Some(scattered), Some(attenuation)) => {
                     emission + Vec3::elemul(attenuation, self.ray_color_pm(scattered, depth - 1))
@@ -258,6 +303,7 @@ fn random_scene() -> World {
             10.0,
             (0.0, 1.0),
         ),
+        vec![],
     )
 }
 
@@ -313,12 +359,12 @@ fn cornell_box_scene() -> World {
         Arc::new(Sphere {
             center: Vec3::new(250., 80., 285.),
             radius: 80.,
-            material: Arc::clone(&green),
+            material: Arc::new(Dielectric::new(1.5)),
         }),
         Arc::new(Sphere {
             center: Vec3::new(90., 90., 150.),
             radius: 90.,
-            material: Arc::new(Dielectric::new(1.5)),
+            material: Arc::clone(&white),
         }),
         Arc::new(Sphere {
             center: Vec3::new(450., 100., 200.),
@@ -338,6 +384,18 @@ fn cornell_box_scene() -> World {
             10.0,
             (0.0, 1.0),
         ),
+        vec![
+            Arc::new(SphereLight {
+                position: Vec3::new(100., 500., 275.),
+                flux: Vec3::new(1., 1., 1.),
+                scale: 500000.,
+            }),
+            Arc::new(SphereLight {
+                position: Vec3::new(450., 500., 275.),
+                flux: Vec3::new(1., 1., 1.),
+                scale: 500000.,
+            }),
+        ],
     )
 }
 
