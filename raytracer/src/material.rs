@@ -5,6 +5,7 @@ use crate::Ray;
 use crate::Vec3;
 use image::{DynamicImage, GenericImageView};
 use rand::Rng;
+use std::f64::consts::PI;
 
 pub enum Interaction {
     Diffuse,
@@ -106,7 +107,7 @@ impl<T: Texture> Lambertian<T> {
 impl<T: Texture> Material for Lambertian<T> {
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
         let scattered = Ray::new(rec.p, self.scattered_direction(rec.normal), r.time);
-        let attenutaion = self.albedo.get_color(rec);
+        let attenutaion = self.albedo.get_color(rec) / PI;
         (Diffuse, Some(scattered), Some(attenutaion))
     }
 
@@ -208,25 +209,25 @@ impl Material for Dielectric {
         )
     }
 }
-//
-// pub struct DiffuseLight<T: Texture> {
-//     pub emit: T,
-// }
-//
-// impl<T: Texture> DiffuseLight<T> {
-//     pub fn new(emit: T) -> Self {
-//         Self { emit }
-//     }
-// }
-//
-// impl<T: Texture> Material for DiffuseLight<T> {
-//     fn scatter(&self, _r: &Ray, _rec: &HitRecord) -> Option<(Vec3, Ray)> {
-//         None
-//     }
-//     fn emitted(&self, rec: &HitRecord) -> Vec3 {
-//         self.emit.get_color(rec)
-//     }
-// }
+
+pub struct DiffuseLight<T: Texture> {
+    pub emit: T,
+}
+
+impl<T: Texture> DiffuseLight<T> {
+    pub fn new(emit: T) -> Self {
+        Self { emit }
+    }
+}
+
+impl<T: Texture> Material for DiffuseLight<T> {
+    fn scatter(&self, _r: &Ray, _rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
+        (Absorb, None, None)
+    }
+    fn emitted(&self, rec: &HitRecord) -> Vec3 {
+        self.emit.get_color(rec)
+    }
+}
 //
 // pub struct Isotropic<T: Texture> {
 //     pub albedo: T,

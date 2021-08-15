@@ -1,9 +1,12 @@
+use crate::objects::hit::{HitRecord, Hitable};
+use crate::objects::rectangle::XZRectangle;
+use crate::scene::World;
 use crate::vec3::polar_direction;
 use crate::{Ray, Vec3};
 use kd_tree::KdPoint;
 use rand::distributions::Distribution;
 use rand::distributions::WeightedIndex;
-use rand::thread_rng;
+use rand::{random, thread_rng, Rng};
 use std::f64::consts::PI;
 use std::sync::Arc;
 
@@ -53,7 +56,7 @@ impl KdPoint for Photon {
 pub trait Light: Sync + Send {
     fn emit(&self) -> (Ray, Vec3); // ray, power
     fn power(&self) -> Vec3; // total power
-    fn sample_li(&self) -> Vec3;
+    fn sample_li(&self, rec: &HitRecord, world: &World) -> Vec3;
 }
 
 pub struct SphereLight {
@@ -72,16 +75,52 @@ impl Light for SphereLight {
     fn power(&self) -> Vec3 {
         self.scale * self.flux
     }
-    fn sample_li(&self) -> Vec3 {
-        todo!()
+    fn sample_li(&self, rec: &HitRecord, world: &World) -> Vec3 {
+        // todo!(maybe bug)
+        let direct_to_light = (self.position - rec.p).unit();
+        let shadow_ray = Ray::new(rec.p, direct_to_light, 0.);
+        let t = (rec.p - self.position).length();
+        if world.bvh.hit(&shadow_ray, 0.0001, t - 0.0001).is_none() {
+            if let (_, _, Some(f)) = rec.mat.scatter(&shadow_ray, rec) {
+                return 1000.
+                    * Vec3::elemul(self.flux, f)
+                    * (rec.normal.unit() * direct_to_light).max(0.0)
+                    / (self.position - rec.p).length();
+            }
+        }
+        Vec3::zero()
     }
 }
 
+// pub struct XZRectLight {
+//     area: XZRectangle,
+//     pub flux: Vec3,
+//     pub scale: f64,
+// }
+//
+// impl Light for XZRectLight {
+//     fn emit(&self) -> (Ray, Vec3) {
+//         let mut rng = rand::thread_rng();
+//         let (u, v) = (rng.gen::<f64>(), rng.gen::<f64>());
+//         let (x0, z0) = self.area.xz0;
+//         let (x1, z1) = self.area.xz1;
+//         let x = x0 + (x1 - x0) * u;
+//         let z = z0 + (z1 - z0) * v;
+//         let orig = Vec3::new(x, self.area.y, z);
+//         let w = Vec3::random_in_hemisphere(&Vec3::new(0., -1., 0.));
+//         (Ray::new(orig, w, 0.), self.flux * self.scale * (Vec3::new(0., -1., 0.) * w).max(0.))
+//     }
+//     fn power(&self) -> Vec3 {
+//         self.flux * self.scale
+//     }
+//     fn sample_li(&self, rec: &HitRecord, world: &World) -> Vec3 {
+//
+//     }
+// }
+
 pub struct AllLights {
-    // lights: RangeMap<f64, Arc<dyn Light>>,
     lights: Vec<Arc<dyn Light>>,
     lights_prob: Vec<f64>,
-    // light_dist: WeightedIndex<f64>,
 }
 
 impl AllLights {
@@ -112,7 +151,7 @@ impl Light for AllLights {
     fn power(&self) -> Vec3 {
         self.lights.iter().map(|l| l.power()).sum()
     }
-    fn sample_li(&self) -> Vec3 {
-        todo!()
+    fn sample_li(&self, rec: &HitRecord, world: &World) -> Vec3 {
+        self.lights.iter().map(|l| l.sample_li(rec, world)).sum()
     }
 }

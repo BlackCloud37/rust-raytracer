@@ -1,5 +1,7 @@
 use crate::light::{AllLights, Light, Photon, SphereLight};
-use crate::material::{ConstantTexture, Dielectric, Interaction, Lambertian, Material, Metal};
+use crate::material::{
+    ConstantTexture, Dielectric, DiffuseLight, Interaction, Lambertian, Material, Metal,
+};
 use crate::objects::bvh::BVHNode;
 // use crate::objects::cube::Cube;
 use crate::objects::hit::Hitable;
@@ -14,7 +16,7 @@ use std::f64::consts::PI;
 use std::sync::Arc;
 
 const N_PHOTONS: usize = 1000000;
-const N_NEAREST: usize = 100;
+const N_NEAREST: usize = 500;
 pub struct Camera {
     pub origin: Vec3,
     pub lower_left_corner: Vec3,
@@ -162,26 +164,45 @@ impl World {
 
             let emission = rec.mat.emitted(&rec); // todo!(emission from light source)
             return match rec.mat.scatter(&r, &rec) {
-                (Interaction::Diffuse, _, _) => {
-                    let (x, y, z) = rec.p.xyz();
-                    let nearest = self.global_pm.nearests(&[x, y, z], N_NEAREST);
-                    let mut flux = Vec3::zero();
-                    let mut radius2: f64 = 0.;
-                    for kd_tree::ItemAndDistance {
-                        item: photon,
-                        squared_distance,
-                    } in nearest.into_iter()
-                    {
-                        radius2 = radius2.max(squared_distance);
-                        if let (_, _, Some(f)) = rec.mat.scatter(
-                            &Ray::new(photon.position(), photon.direction(), r.time),
-                            &rec,
-                        ) {
-                            // let li = Vec3::zero();
-                            flux += Vec3::elemul(f, photon.power());
-                        }
-                    }
-                    emission + flux / (PI * radius2 * N_PHOTONS as f64)
+                (Interaction::Diffuse, Some(scattered), Some(attenuation)) => {
+                    // let (x, y, z) = rec.p.xyz();
+                    // let nearest = self.caustic_pm.nearests(&[x, y, z], N_NEAREST);
+                    // let mut caustic_flux = Vec3::zero();
+                    // let mut radius2: f64 = 0.;
+                    // for kd_tree::ItemAndDistance {
+                    //     item: photon,
+                    //     squared_distance,
+                    // } in nearest.into_iter()
+                    // {
+                    //     radius2 = radius2.max(squared_distance);
+                    //     if let (_, _, Some(f)) = rec.mat.scatter(
+                    //         &Ray::new(photon.position(), photon.direction(), r.time),
+                    //         &rec,
+                    //     ) {
+                    //         caustic_flux += Vec3::elemul(f, photon.power());
+                    //     }
+                    // }
+
+                    // let nearest = self.global_pm.nearests(&[x, y, z], N_NEAREST);
+                    // let mut global_flux = Vec3::zero();
+                    // let mut radius3: f64 = 0.;
+                    // for kd_tree::ItemAndDistance {
+                    //     item: photon,
+                    //     squared_distance,
+                    // } in nearest.into_iter()
+                    // {
+                    //     radius3 = radius3.max(squared_distance);
+                    //     if let (_, _, Some(f)) = rec.mat.scatter(
+                    //         &Ray::new(photon.position(), photon.direction(), r.time),
+                    //         &rec,
+                    //     ) {
+                    //         global_flux += Vec3::elemul(f, photon.power());
+                    //     }
+                    // }
+                    // emission + Vec3::elemul(attenuation, self.ray_color_pm(scattered, depth - 1))
+                    emission + self.lights.sample_li(&rec, self)
+                    // + caustic_flux / (PI * radius2 * N_PHOTONS as f64)
+                    // + global_flux / (PI * radius3 * N_PHOTONS as f64)
                 }
                 (_, Some(scattered), Some(attenuation)) => {
                     emission + Vec3::elemul(attenuation, self.ray_color_pm(scattered, depth - 1))
@@ -293,8 +314,8 @@ fn cornell_box_scene() -> World {
     let green: Arc<dyn Material> = Arc::new(Lambertian::new(ConstantTexture(Vec3::new(
         0.12, 0.45, 0.15,
     ))));
-    // let light: Arc<dyn Material> =
-    //     Arc::new(DiffuseLight::new(ConstantTexture(Vec3::new(7., 7., 7.))));
+    let light: Arc<dyn Material> =
+        Arc::new(DiffuseLight::new(ConstantTexture(Vec3::new(3., 3., 3.))));
     let hitable_list: Vec<Arc<dyn Hitable>> = vec![
         Arc::new(YZRectangle {
             yz0: (0.0, 0.0),
@@ -308,12 +329,12 @@ fn cornell_box_scene() -> World {
             x: 0.,
             material: Arc::clone(&green),
         }),
-        // Arc::new(XZRectangle {
-        //     xz0: (113., 127.),
-        //     xz1: (443., 432.),
-        //     y: 554.,
-        //     material: Arc::clone(&light),
-        // }),
+        Arc::new(XZRectangle {
+            xz0: (113., 127.),
+            xz1: (443., 432.),
+            y: 554.,
+            material: Arc::clone(&light),
+        }),
         Arc::new(XZRectangle {
             xz0: (0., 0.),
             xz1: (555., 555.),
@@ -362,15 +383,15 @@ fn cornell_box_scene() -> World {
         ),
         vec![
             Arc::new(SphereLight {
-                position: Vec3::new(100., 500., 275.),
+                position: Vec3::new(275., 553., 275.),
                 flux: Vec3::new(1., 1., 1.),
                 scale: 500000.,
             }),
-            Arc::new(SphereLight {
-                position: Vec3::new(450., 500., 275.),
-                flux: Vec3::new(1., 1., 1.),
-                scale: 500000.,
-            }),
+            // Arc::new(SphereLight {
+            //     position: Vec3::new(450., 500., 275.),
+            //     flux: Vec3::new(1., 1., 1.),
+            //     scale: 500000.,
+            // }),
         ],
     )
 }
