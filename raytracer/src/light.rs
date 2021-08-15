@@ -1,12 +1,12 @@
 use crate::objects::hit::{HitRecord, Hitable};
-use crate::objects::rectangle::XZRectangle;
+// use crate::objects::rectangle::XZRectangle;
 use crate::scene::World;
 use crate::vec3::polar_direction;
 use crate::{Ray, Vec3};
 use kd_tree::KdPoint;
 use rand::distributions::Distribution;
 use rand::distributions::WeightedIndex;
-use rand::{random, thread_rng, Rng};
+use rand::thread_rng;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
@@ -82,10 +82,8 @@ impl Light for SphereLight {
         let t = (rec.p - self.position).length();
         if world.bvh.hit(&shadow_ray, 0.0001, t - 0.0001).is_none() {
             if let (_, _, Some(f)) = rec.mat.scatter(&shadow_ray, rec) {
-                return 1000.
-                    * Vec3::elemul(self.flux, f)
-                    * (rec.normal.unit() * direct_to_light).max(0.0)
-                    / (self.position - rec.p).length();
+                return Vec3::elemul(self.flux, f) * (rec.normal.unit() * direct_to_light).max(0.0);
+                // / (self.position - rec.p).length();
             }
         }
         Vec3::zero()

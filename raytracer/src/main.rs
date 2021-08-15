@@ -40,7 +40,7 @@ fn main() {
     let height = (width as f64 / aspect_ratio) as u32;
 
     let max_depth = 40;
-    let samples_per_pixel = 512;
+    let samples_per_pixel = 64;
     // create a channel to send objects between threads
     let (tx, rx) = channel();
     let pool = ThreadPool::new(n_workers);
