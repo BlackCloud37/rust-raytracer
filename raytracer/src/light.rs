@@ -1,7 +1,11 @@
 use crate::vec3::polar_direction;
 use crate::{Ray, Vec3};
 use kd_tree::KdPoint;
+use rand::distributions::Distribution;
+use rand::distributions::WeightedIndex;
+use rand::thread_rng;
 use std::f64::consts::PI;
+use std::sync::Arc;
 
 pub struct Photon {
     position: Vec3,
@@ -48,7 +52,8 @@ impl KdPoint for Photon {
 
 pub trait Light: Sync + Send {
     fn emit(&self) -> (Ray, Vec3); // ray, power
-    fn power(&self) -> Vec3;
+    fn power(&self) -> Vec3; // total power
+    fn sample_li(&self) -> Vec3;
 }
 
 pub struct SphereLight {
@@ -66,5 +71,48 @@ impl Light for SphereLight {
     }
     fn power(&self) -> Vec3 {
         self.scale * self.flux
+    }
+    fn sample_li(&self) -> Vec3 {
+        todo!()
+    }
+}
+
+pub struct AllLights {
+    // lights: RangeMap<f64, Arc<dyn Light>>,
+    lights: Vec<Arc<dyn Light>>,
+    lights_prob: Vec<f64>,
+    // light_dist: WeightedIndex<f64>,
+}
+
+impl AllLights {
+    pub fn new(lights: Vec<Arc<dyn Light>>) -> Self {
+        let light_powers = lights
+            .iter()
+            .map(|l| l.power().length())
+            .collect::<Vec<f64>>();
+        let tot_power: f64 = light_powers.iter().sum();
+        let lights_prob = light_powers
+            .iter()
+            .map(|p| p / tot_power)
+            .collect::<Vec<f64>>();
+        Self {
+            lights,
+            lights_prob,
+        }
+    }
+}
+
+impl Light for AllLights {
+    fn emit(&self) -> (Ray, Vec3) {
+        let mut rng = thread_rng();
+        let light_dist = WeightedIndex::new(&self.lights_prob).unwrap();
+        let idx: usize = light_dist.sample(&mut rng);
+        self.lights[idx].emit()
+    }
+    fn power(&self) -> Vec3 {
+        self.lights.iter().map(|l| l.power()).sum()
+    }
+    fn sample_li(&self) -> Vec3 {
+        todo!()
     }
 }

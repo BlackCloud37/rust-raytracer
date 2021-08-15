@@ -3,6 +3,7 @@ use image::{Rgb, Rgba};
 use nalgebra::{Matrix4, Matrix4x1};
 use rand::{thread_rng, Rng};
 use std::f64::consts::PI;
+use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Index, Mul, MulAssign, Neg, Sub, SubAssign};
 
 #[derive(Clone, Debug, PartialEq, Copy)]
@@ -392,6 +393,11 @@ impl Neg for Vec3 {
     }
 }
 
+impl Sum for Vec3 {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.fold(Self::zero(), |a, b| a + b)
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

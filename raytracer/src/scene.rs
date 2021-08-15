@@ -1,4 +1,4 @@
-use crate::light::{Light, Photon, SphereLight};
+use crate::light::{AllLights, Light, Photon, SphereLight};
 use crate::material::{ConstantTexture, Dielectric, Interaction, Lambertian, Material, Metal};
 use crate::objects::bvh::BVHNode;
 // use crate::objects::cube::Cube;
@@ -13,8 +13,8 @@ use rand::Rng;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
-const N_PHOTONS: usize = 20000000;
-const N_NEAREST: usize = 1000;
+const N_PHOTONS: usize = 1000000;
+const N_NEAREST: usize = 100;
 pub struct Camera {
     pub origin: Vec3,
     pub lower_left_corner: Vec3,
@@ -86,7 +86,7 @@ pub struct World {
     // pub hitable_list: Vec<Arc<dyn Hitable>>,
     pub bvh: BVHNode,
     pub cam: Camera,
-    pub lights: Vec<Arc<dyn Light>>,
+    pub lights: AllLights,
     pub global_pm: KdTreeN<Photon, typenum::U3>,
     pub caustic_pm: KdTreeN<Photon, typenum::U3>,
     // pub volume_pm
@@ -101,7 +101,7 @@ impl World {
         Self {
             bvh: BVHNode::new(hitable_list, 0.0, 1.0),
             cam,
-            lights,
+            lights: AllLights::new(lights),
             global_pm: KdTreeN::default(),
             caustic_pm: KdTreeN::default(),
         }
@@ -110,59 +110,33 @@ impl World {
     pub fn map_photons(&mut self) {
         let mut all_photons = vec![];
         let mut caustic_photons = vec![];
-        let tot_power = self.lights.iter().map(|l| l.power()).reduce(|a, b| a + b);
-        if let Some(tot_power) = tot_power {
-            for light in self.lights.iter() {
-                let n_emit =
-                    (N_PHOTONS as f64 * (light.power().length() / tot_power.length())) as usize;
-                for _ in 0..n_emit {
-                    // trace photon
-                    let (mut ray, mut power) = light.emit();
-                    while let Some(rec) = self.bvh.hit(&ray, 0.0001, f64::INFINITY) {
-                        // hit sth., record if diffuse and update power/ray
-                        let (interaction, out_ray, new_power) =
-                            rec.mat.scatter_photon(&ray, &rec, power);
-                        match interaction {
-                            Interaction::Diffuse => {
-                                all_photons.push(Photon::new(rec.p, power, ray.dir));
-                            }
-                            Interaction::Absorb => {
-                                break;
-                            }
-                            _ => {}
-                        }
-                        if let (Some(out_ray), Some(new_power)) = (out_ray, new_power) {
-                            ray = out_ray;
-                            power = new_power;
-                        }
-                    }
 
-                    // caustic
-                    let (mut ray, mut power) = light.emit();
-                    let mut has_specular_or_glossy = false;
-                    while let Some(rec) = self.bvh.hit(&ray, 0.0001, f64::INFINITY) {
-                        // hit sth., record if diffuse and update power/ray
-                        let (interaction, out_ray, new_power) =
-                            rec.mat.scatter_photon(&ray, &rec, power);
-                        match interaction {
-                            Interaction::Diffuse => {
-                                if has_specular_or_glossy {
-                                    caustic_photons.push(Photon::new(ray.orig, power, ray.dir));
-                                }
-                                break;
-                            }
-                            Interaction::Absorb => {
-                                break;
-                            }
-                            _ => {
-                                has_specular_or_glossy = true;
-                            }
+        // trace photon
+        for _ in 0..N_PHOTONS {
+            let (mut ray, mut power) = self.lights.emit();
+            let (mut has_specular, mut has_diffuse) = (false, false);
+            while let Some(rec) = self.bvh.hit(&ray, 0.0001, f64::INFINITY) {
+                // hit sth., record if diffuse and update power/ray
+                let (interaction, out_ray, new_power) = rec.mat.scatter_photon(&ray, &rec, power);
+                match interaction {
+                    Interaction::Diffuse => {
+                        all_photons.push(Photon::new(rec.p, power, ray.dir));
+                        if !has_diffuse && has_specular {
+                            // LS+D only
+                            caustic_photons.push(Photon::new(rec.p, power, ray.dir))
                         }
-                        if let (Some(out_ray), Some(new_power)) = (out_ray, new_power) {
-                            ray = out_ray;
-                            power = new_power;
-                        }
+                        has_diffuse = true;
                     }
+                    Interaction::Absorb => {
+                        break;
+                    }
+                    _ => {
+                        has_specular = true;
+                    }
+                }
+                if let (Some(out_ray), Some(new_power)) = (out_ray, new_power) {
+                    ray = out_ray;
+                    power = new_power;
                 }
             }
         }
@@ -178,7 +152,6 @@ impl World {
             return Vec3::zero();
         }
         if let Some(rec) = self.bvh.hit(&r, 0.001, f64::INFINITY) {
-            let emission = rec.mat.emitted(&rec);
             if debug_render_pm {
                 let (x, y, z) = rec.p.xyz();
                 let within_global = self.global_pm.within_radius(&[x, y, z], 3.);
@@ -186,6 +159,8 @@ impl World {
                 return Vec3::new(1., 0., 0.) * (within_global.len() as f64 / N_NEAREST as f64)
                     + Vec3::new(0., 1., 0.) * (within_caustic.len() as f64 / N_NEAREST as f64);
             }
+
+            let emission = rec.mat.emitted(&rec); // todo!(emission from light source)
             return match rec.mat.scatter(&r, &rec) {
                 (Interaction::Diffuse, _, _) => {
                     let (x, y, z) = rec.p.xyz();
@@ -202,6 +177,7 @@ impl World {
                             &Ray::new(photon.position(), photon.direction(), r.time),
                             &rec,
                         ) {
+                            // let li = Vec3::zero();
                             flux += Vec3::elemul(f, photon.power());
                         }
                     }
