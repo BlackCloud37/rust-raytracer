@@ -70,8 +70,8 @@ pub struct World {
     pub bvh: BVHNode,
     pub cam: Camera,
     pub lights: AllLights,
-    pub global_pm: KdTreeN<Photon, typenum::U3>,
-    pub caustic_pm: KdTreeN<Photon, typenum::U3>,
+    // pub global_pm: KdTreeN<Photon, typenum::U3>,
+    // pub caustic_pm: KdTreeN<Photon, typenum::U3>,
     // pub volume_pm
 }
 
@@ -85,8 +85,8 @@ impl World {
             bvh: BVHNode::new(hitable_list),
             cam,
             lights: AllLights::new(lights),
-            global_pm: KdTreeN::default(),
-            caustic_pm: KdTreeN::default(),
+            // global_pm: KdTreeN::default(),
+            // caustic_pm: KdTreeN::default(),
         }
     }
 
@@ -105,12 +105,12 @@ impl World {
         } in nearest.into_iter()
         {
             radius2 = radius2.max(squared_distance);
-            flux += Vec3::elemul(rec.mat.bsdf(photon.direction(), &rec), photon.power());
+            flux += Vec3::elemul(rec.mat.bsdf(*photon.direction(), &rec), *photon.power());
         }
         flux / (PI * radius2 * N_PHOTONS as f64)
     }
 
-    pub fn map_photons(&mut self) {
+    pub fn map_photons(&self) -> (KdTreeN<Photon, typenum::U3>, KdTreeN<Photon, typenum::U3>) {
         let mut all_photons = vec![];
         let mut caustic_photons = vec![];
 
@@ -145,11 +145,21 @@ impl World {
         }
 
         // build kd tree
-        self.global_pm = kd_tree::KdTree::build_by_ordered_float(all_photons);
-        self.caustic_pm = kd_tree::KdTree::build_by_ordered_float(caustic_photons);
+        (
+            kd_tree::KdTree::build_by_ordered_float(all_photons),
+            kd_tree::KdTree::build_by_ordered_float(caustic_photons),
+        )
+        // self.global_pm = ;
+        // self.caustic_pm = ;
     }
 
-    pub fn ray_color_pm(&self, r: Ray, depth: i32) -> Vec3 {
+    pub fn ray_color_pm(
+        &self,
+        r: Ray,
+        depth: i32,
+        global_pm: &KdTreeN<Photon, typenum::U3>,
+        caustic_pm: &KdTreeN<Photon, typenum::U3>,
+    ) -> Vec3 {
         let debug_render_pm = false;
         if depth <= 0 {
             return Vec3::zero();
@@ -157,8 +167,8 @@ impl World {
         if let Some(rec) = self.bvh.hit(&r, 0.001, f64::INFINITY) {
             if debug_render_pm {
                 let (x, y, z) = rec.p.xyz();
-                let within_global = self.global_pm.within_radius(&[x, y, z], 3.);
-                let within_caustic = self.caustic_pm.within_radius(&[x, y, z], 3.);
+                let within_global = global_pm.within_radius(&[x, y, z], 3.);
+                let within_caustic = caustic_pm.within_radius(&[x, y, z], 3.);
                 return Vec3::new(1., 0., 0.) * (within_global.len() as f64 / 50.)
                     + Vec3::new(0., 1., 0.) * (within_caustic.len() as f64 / 50.);
             }
@@ -166,27 +176,33 @@ impl World {
             let emission = rec.mat.emitted(&rec);
             match rec.mat.scatter(&r, &rec) {
                 (Interaction::Diffuse, Some(_scattered), Some(attenuation)) => {
-                    let caustic_flux = World::estimate_flux(&self.caustic_pm, &rec, 5);
+                    let caustic_flux = World::estimate_flux(caustic_pm, &rec, 10);
                     // global
                     let mut global_flux = Vec3::zero();
                     // todo!(uniform sample)
                     const GATHER_CNT: usize = 4;
+                    const FRAC_1_GATHER_CNT: f64 = 1. / GATHER_CNT as f64;
                     for _ in 0..GATHER_CNT {
                         let diffuse_ray = Ray::new(rec.p, Vec3::random_in_hemisphere(&rec.normal));
                         if let Some(another_rec) = self.bvh.hit(&diffuse_ray, 0.0001, f64::INFINITY)
                         {
-                            global_flux += World::estimate_flux(&self.global_pm, &another_rec, 25);
+                            global_flux += World::estimate_flux(global_pm, &another_rec, 25);
                         }
                     }
-                    global_flux /= GATHER_CNT as f64;
+                    global_flux *= FRAC_1_GATHER_CNT;
                     global_flux = Vec3::elemul(global_flux, attenuation);
-                    self.lights.sample_li(&rec, self, 8) + emission + caustic_flux + global_flux
+                    // global_flux = World::estimate_flux(global_pm, &rec, 100);
+                    self.lights.sample_li(&rec, self, 10) + emission + caustic_flux + global_flux
                     // emission + caustic_flux + global_flux
                     // emission + caustic_flux
                     // emission + global_flux
                 }
                 (_, Some(scattered), Some(attenuation)) => {
-                    emission + Vec3::elemul(attenuation, self.ray_color_pm(scattered, depth - 1))
+                    emission
+                        + Vec3::elemul(
+                            attenuation,
+                            self.ray_color_pm(scattered, depth - 1, global_pm, caustic_pm),
+                        )
                 }
                 _ => emission,
             }

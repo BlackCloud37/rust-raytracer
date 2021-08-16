@@ -3,43 +3,42 @@ use crate::objects::hit::{HitRecord, Hitable};
 use crate::material::{ConstantTexture, DiffuseLight};
 use crate::objects::aabb::AABB;
 use crate::objects::sphere::Sphere;
-use crate::vec3::polar_direction;
+// use crate::vec3::polar_direction;
 use crate::world::World;
 use crate::{Ray, Vec3};
 use kd_tree::KdPoint;
 use rand::distributions::Distribution;
 use rand::distributions::WeightedIndex;
 use rand::thread_rng;
-use std::f64::consts::{FRAC_1_PI, PI};
+// use std::f64::consts::{FRAC_1_PI, PI};
 use std::sync::Arc;
 
 pub struct Photon {
     position: Vec3,
-    phi: u8,
-    theta: u8,
     power: Vec3,
+    direction: Vec3,
 }
 
 impl Photon {
     pub fn new(position: Vec3, power: Vec3, direction: Vec3) -> Self {
-        let phi =
-            (255. * (f64::atan2(direction.y, direction.x) + PI) * 0.5 * FRAC_1_PI).floor() as u8;
-        let theta = (255. * f64::acos(direction.x) * FRAC_1_PI).floor() as u8;
+        // let phi =
+        //     (255. * (f64::atan2(direction.y, direction.x) + PI) * 0.5 * FRAC_1_PI).floor() as u8;
+        // let theta = (255. * f64::acos(direction.x) * FRAC_1_PI).floor() as u8;
         Self {
             position,
-            phi,
-            theta,
             power,
+            direction,
         }
     }
     // pub fn position(&self) -> Vec3 {
     //     self.position
     // }
-    pub fn power(&self) -> Vec3 {
-        self.power
+    pub fn power(&self) -> &Vec3 {
+        &self.power
     }
-    pub fn direction(&self) -> Vec3 {
-        polar_direction(self.theta, self.phi)
+    pub fn direction(&self) -> &Vec3 {
+        &self.direction
+        // polar_direction(self.theta, self.phi)
     }
 }
 
@@ -107,10 +106,11 @@ impl Light for SphereDiffuseLight {
     fn power(&self) -> Vec3 {
         self.scale * self.flux
     }
-    fn sample_li(&self, rec: &HitRecord, world: &World, sample_cnt: usize) -> Vec3 {
+    fn sample_li(&self, rec: &HitRecord, world: &World, shadow_rays: usize) -> Vec3 {
         let mut sample_li = Vec3::zero();
-        for _ in 0..sample_cnt {
+        for _ in 0..shadow_rays {
             let center_to_p = (rec.p - self.sphere.center).unit();
+            // todo!(uniform sample hemisphere)
             let point_on_sphere =
                 self.sphere.center + Vec3::random_in_hemisphere(&center_to_p) * self.sphere.radius;
             let direct_to_light = (point_on_sphere - rec.p).unit();
@@ -118,11 +118,11 @@ impl Light for SphereDiffuseLight {
             let t = (rec.p - point_on_sphere).length();
             if world.bvh.hit(&shadow_ray, 0.0001, t - 0.0001).is_none() {
                 sample_li += Vec3::elemul(self.flux, rec.mat.bsdf(shadow_ray.dir, rec))
-                    * (rec.normal * direct_to_light).max(0.0);
-                // / (self.position - rec.p).length();
+                    * (rec.normal * direct_to_light).max(0.0)
+                    / (t * t * 0.00005);
             }
         }
-        sample_li / sample_cnt as f64
+        sample_li / shadow_rays as f64
     }
 }
 

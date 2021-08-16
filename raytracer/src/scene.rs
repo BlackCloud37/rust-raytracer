@@ -20,8 +20,8 @@ fn cornell_box_scene() -> World {
     let light = SphereDiffuseLight::new(
         Vec3::new(275., 550., 275.),
         50.,
-        Vec3::new(4., 4., 4.),
-        20000000.,
+        Vec3::new(3., 3., 3.),
+        30000000.,
     );
 
     let hitable_list: Vec<Arc<dyn Hitable>> = vec![
