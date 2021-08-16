@@ -277,7 +277,7 @@ fn cornell_box_scene() -> World {
         Arc::new(Sphere {
             center: Vec3::new(200., 120., 300.),
             radius: 120.,
-            material: Arc::new(Dielectric::new(1.5)),
+            material: Arc::new(Dielectric::new(1.5, ConstantTexture(Vec3::ones()))),
         }),
         Arc::new(Sphere {
             center: Vec3::new(90., 90., 150.),

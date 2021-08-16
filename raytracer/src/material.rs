@@ -19,7 +19,7 @@ pub trait Texture: Send + Sync {
     fn get_color(&self, rec: &HitRecord) -> Vec3;
 }
 pub trait Material: Send + Sync {
-    // fn f(&self, wi: Vec3, wo: Vec3) -> Vec3;
+    fn bsdf(&self, ray_in: &Ray, rec: &HitRecord) -> Vec3;
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>);
     fn emitted(&self, _rec: &HitRecord) -> Vec3 {
         Vec3::zero()
@@ -105,36 +105,13 @@ impl<T: Texture> Lambertian<T> {
 }
 
 impl<T: Texture> Material for Lambertian<T> {
+    fn bsdf(&self, _ray_in: &Ray, rec: &HitRecord) -> Vec3 {
+        self.albedo.get_color(rec) / PI
+    }
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
         let scattered = Ray::new(rec.p, self.scattered_direction(rec.normal), r.time);
-        let attenutaion = self.albedo.get_color(rec) / PI;
-        (Diffuse, Some(scattered), Some(attenutaion))
+        (Diffuse, Some(scattered), Some(self.bsdf(r, rec)))
     }
-
-    // fn scatter_photon(
-    //     &self,
-    //     r: &Ray,
-    //     rec: &HitRecord,
-    //     power: Vec3,
-    // ) -> (Interaction, Option<Ray>, Option<Vec3>) {
-    //     let diffuse_color = self.albedo.get_color(rec);
-    //     let max_diffuse = diffuse_color.max();
-    //
-    //     // R.R., to decide if absorbed
-    //     if rand::thread_rng().gen::<f64>() > max_diffuse {
-    //         return (Absorb, None, None);
-    //     }
-    //
-    //     let change_emit = diffuse_color / max_diffuse;
-    //
-    //     let scatter_direction = self.scattered_direction(rec.normal);
-    //
-    //     (
-    //         Diffuse,
-    //         Some(Ray::new(rec.p, scatter_direction, r.time)), // out ray
-    //         Some(Vec3::elemul(power, change_emit)),
-    //     ) // new power
-    // }
 }
 
 pub struct Metal<T: Texture> {
@@ -149,6 +126,9 @@ impl<T: Texture> Metal<T> {
 }
 
 impl<T: Texture> Material for Metal<T> {
+    fn bsdf(&self, _ray_in: &Ray, rec: &HitRecord) -> Vec3 {
+        self.albedo.get_color(rec)
+    }
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
         let reflected = Vec3::reflect(r.dir.unit(), rec.normal);
         let scattered = Ray::new(
@@ -157,21 +137,21 @@ impl<T: Texture> Material for Metal<T> {
             r.time,
         );
         if scattered.dir * rec.normal > 0. {
-            let attenuation = self.albedo.get_color(rec);
-            (Specular, Some(scattered), Some(attenuation))
+            (Specular, Some(scattered), Some(self.bsdf(r, rec)))
         } else {
             (Absorb, None, None)
         }
     }
 }
 
-pub struct Dielectric {
+pub struct Dielectric<T: Texture> {
     pub ir: f64,
+    pub albedo: T,
 }
 
-impl Dielectric {
-    pub fn new(ir: f64) -> Self {
-        Self { ir }
+impl<T: Texture> Dielectric<T> {
+    pub fn new(ir: f64, albedo: T) -> Self {
+        Self { ir, albedo }
     }
     pub fn reflectance(cosine: f64, ref_idx: f64) -> f64 {
         // Use Schlick's approximation for reflectance
@@ -180,9 +160,12 @@ impl Dielectric {
     }
 }
 
-impl Material for Dielectric {
+impl<T: Texture> Material for Dielectric<T> {
+    fn bsdf(&self, _ray_in: &Ray, rec: &HitRecord) -> Vec3 {
+        self.albedo.get_color(rec)
+    }
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
-        let attenuation = Vec3::ones();
+        let attenuation = self.bsdf(r, rec);
         let refraction_ratio = if rec.front_face {
             1.0 / self.ir
         } else {
@@ -222,6 +205,9 @@ impl<T: Texture> DiffuseLight<T> {
 }
 
 impl<T: Texture> Material for DiffuseLight<T> {
+    fn bsdf(&self, _ray_in: &Ray, _rec: &HitRecord) -> Vec3 {
+        Vec3::zero()
+    }
     fn scatter(&self, _r: &Ray, _rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
         (Absorb, None, None)
     }
