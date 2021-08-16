@@ -88,7 +88,6 @@ fn cornell_box_scene() -> World {
             16. / 9.,
             0.0,
             10.0,
-            (0.0, 1.0),
         ),
         vec![Arc::new(light)],
     )

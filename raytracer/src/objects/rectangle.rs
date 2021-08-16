@@ -32,7 +32,7 @@ impl Hitable for XYRectangle {
             ((x - x0) / (x1 - x0), (y - y0) / (y1 - y0)),
         ))
     }
-    fn bounding_box(&self, _time0: f64, _time1: f64) -> Option<AABB> {
+    fn bounding_box(&self) -> Option<AABB> {
         const BIAS: f64 = 0.0001;
         Some(AABB::new(
             Vec3::new(self.xy0.0, self.xy0.1, self.z - BIAS),
@@ -69,7 +69,7 @@ impl Hitable for XZRectangle {
             ((x - x0) / (x1 - x0), (z - z0) / (z1 - z0)),
         ))
     }
-    fn bounding_box(&self, _time0: f64, _time1: f64) -> Option<AABB> {
+    fn bounding_box(&self) -> Option<AABB> {
         const BIAS: f64 = 0.0001;
         Some(AABB::new(
             Vec3::new(self.xz0.0, self.y - BIAS, self.xz0.1),
@@ -106,7 +106,7 @@ impl Hitable for YZRectangle {
             ((y - y0) / (y1 - y0), (z - z0) / (z1 - z0)),
         ))
     }
-    fn bounding_box(&self, _time0: f64, _time1: f64) -> Option<AABB> {
+    fn bounding_box(&self) -> Option<AABB> {
         const BIAS: f64 = 0.0001;
         Some(AABB::new(
             Vec3::new(self.x - BIAS, self.yz0.0, self.yz0.1),

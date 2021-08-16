@@ -50,7 +50,7 @@ impl HitRecord {
 
 pub trait Hitable: Sync + Send {
     fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
-    fn bounding_box(&self, time0: f64, time1: f64) -> Option<AABB>;
+    fn bounding_box(&self) -> Option<AABB>;
 }
 
 impl Hitable for Vec<Arc<dyn Hitable>> {
@@ -66,7 +66,7 @@ impl Hitable for Vec<Arc<dyn Hitable>> {
         res
     }
 
-    fn bounding_box(&self, time0: f64, time1: f64) -> Option<AABB> {
+    fn bounding_box(&self) -> Option<AABB> {
         if self.is_empty() {
             return None;
         }
@@ -77,7 +77,7 @@ impl Hitable for Vec<Arc<dyn Hitable>> {
             maximum: Vec3::zero(),
         };
         for object in self {
-            if let Some(temp_box) = object.bounding_box(time0, time1) {
+            if let Some(temp_box) = object.bounding_box() {
                 output_box = if first_box {
                     temp_box
                 } else {

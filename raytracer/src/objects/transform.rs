@@ -107,7 +107,7 @@ impl Transform {
         //print!("{}", trans);
         // compute bounding box
         let mut bounding_box = None;
-        if let Some(bbox) = obj.bounding_box(0., 1.) {
+        if let Some(bbox) = obj.bounding_box() {
             let mut min = [f64::INFINITY, f64::INFINITY, f64::INFINITY];
             let mut max = [-f64::INFINITY, -f64::INFINITY, -f64::INFINITY];
             for i in 0..2 {
@@ -152,7 +152,6 @@ impl Hitable for Transform {
         let trans_r = Ray::new(
             r.orig.transform_point(&self.inverse_trans),
             r.dir.transform_dir(&self.inverse_trans),
-            r.time,
         );
         if let Some(mut trans_rec) = self.obj.hit(&trans_r, t_min, t_max) {
             let outward_normal = trans_rec.normal.transform_dir(&self.trans);
@@ -163,7 +162,7 @@ impl Hitable for Transform {
             None
         }
     }
-    fn bounding_box(&self, _time0: f64, _time1: f64) -> Option<AABB> {
+    fn bounding_box(&self) -> Option<AABB> {
         Some(self.bounding_box.as_ref().unwrap().clone())
     }
 }

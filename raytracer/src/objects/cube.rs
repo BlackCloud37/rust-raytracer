@@ -64,7 +64,7 @@ impl Hitable for Cube {
     fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
         self.sides.hit(r, t_min, t_max)
     }
-    fn bounding_box(&self, _time0: f64, _time1: f64) -> Option<AABB> {
+    fn bounding_box(&self) -> Option<AABB> {
         Some(AABB::new(self.box_min, self.box_max))
     }
 }

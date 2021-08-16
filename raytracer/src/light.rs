@@ -87,8 +87,8 @@ impl Hitable for SphereDiffuseLight {
     fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
         self.sphere.hit(r, t_min, t_max)
     }
-    fn bounding_box(&self, time0: f64, time1: f64) -> Option<AABB> {
-        self.sphere.bounding_box(time0, time1)
+    fn bounding_box(&self) -> Option<AABB> {
+        self.sphere.bounding_box()
     }
 }
 
@@ -99,7 +99,6 @@ impl Light for SphereDiffuseLight {
             Ray::new(
                 self.sphere.center + dir * (self.sphere.radius + 0.0001),
                 dir,
-                0.,
             ),
             self.flux * self.scale,
         )
@@ -114,7 +113,7 @@ impl Light for SphereDiffuseLight {
             let point_on_sphere =
                 self.sphere.center + Vec3::random_in_hemisphere(&center_to_p) * self.sphere.radius;
             let direct_to_light = (point_on_sphere - rec.p).unit();
-            let shadow_ray = Ray::new(rec.p, direct_to_light, 0.);
+            let shadow_ray = Ray::new(rec.p, direct_to_light);
             let t = (rec.p - point_on_sphere).length();
             if world.bvh.hit(&shadow_ray, 0.0001, t - 0.0001).is_none() {
                 sample_li += Vec3::elemul(self.flux, rec.mat.bsdf(shadow_ray.dir, rec))

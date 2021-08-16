@@ -32,8 +32,8 @@ pub struct BVHNode {
     pub bounding_box: AABB,
 }
 fn box_compare(a: &Arc<dyn Hitable>, b: &Arc<dyn Hitable>, axis: usize) -> Ordering {
-    let box_a = a.bounding_box(0., 1.);
-    let box_b = b.bounding_box(0., 1.);
+    let box_a = a.bounding_box();
+    let box_b = b.bounding_box();
     if let (Some(box_a), Some(box_b)) = (box_a, box_b) {
         return match box_a.minimum[axis] < box_b.minimum[axis] {
             true => Ordering::Less,
@@ -45,8 +45,8 @@ fn box_compare(a: &Arc<dyn Hitable>, b: &Arc<dyn Hitable>, axis: usize) -> Order
 
 impl BVHNode {
     pub fn construct(left: Arc<dyn Hitable>, right: Arc<dyn Hitable>) -> Self {
-        let box_left = left.bounding_box(0., 1.);
-        let box_right = right.bounding_box(0., 1.);
+        let box_left = left.bounding_box();
+        let box_right = right.bounding_box();
         if let (Some(box_left), Some(box_right)) = (box_left, box_right) {
             return Self {
                 bounding_box: AABB::surrounding_box(&box_left, &box_right),
@@ -57,7 +57,7 @@ impl BVHNode {
         panic!("No bounding box in bvh_node constructor.\n")
     }
 
-    pub fn new(src_objects: Vec<Arc<dyn Hitable>>, time0: f64, time1: f64) -> Self {
+    pub fn new(src_objects: Vec<Arc<dyn Hitable>>) -> Self {
         let mut rng = rand::thread_rng();
         let axis = rng.gen_range(0..3);
         let comparator = |a: &Arc<dyn Hitable>, b: &Arc<dyn Hitable>| box_compare(a, b, axis);
@@ -75,8 +75,8 @@ impl BVHNode {
                 let mut objects = src_objects;
                 objects.sort_by(comparator);
                 let mid = object_span / 2;
-                let left = Self::new(objects[0..mid].to_vec(), time0, time1);
-                let right = Self::new(objects[mid..].to_vec(), time0, time1);
+                let left = Self::new(objects[0..mid].to_vec());
+                let right = Self::new(objects[mid..].to_vec());
                 Self::construct(Arc::new(left), Arc::new(right))
             }
         }
@@ -100,7 +100,7 @@ impl Hitable for BVHNode {
             _ => hit_left,
         }
     }
-    fn bounding_box(&self, _time0: f64, _time1: f64) -> Option<AABB> {
+    fn bounding_box(&self) -> Option<AABB> {
         Some(self.bounding_box.clone())
     }
 }

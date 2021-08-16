@@ -109,7 +109,7 @@ impl<T: Texture> Material for Lambertian<T> {
         self.albedo.get_color(rec) / PI
     }
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
-        let scattered = Ray::new(rec.p, self.scattered_direction(rec.normal), r.time);
+        let scattered = Ray::new(rec.p, self.scattered_direction(rec.normal));
         (Diffuse, Some(scattered), Some(self.bsdf(r.dir, rec)))
     }
 }
@@ -131,11 +131,7 @@ impl<T: Texture> Material for Metal<T> {
     }
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
         let reflected = Vec3::reflect(r.dir.unit(), rec.normal);
-        let scattered = Ray::new(
-            rec.p,
-            reflected + self.fuzz * Vec3::random_in_unit_sphere(),
-            r.time,
-        );
+        let scattered = Ray::new(rec.p, reflected + self.fuzz * Vec3::random_in_unit_sphere());
         if scattered.dir * rec.normal > 0. {
             (Specular, Some(scattered), Some(self.bsdf(r.dir, rec)))
         } else {
@@ -187,7 +183,7 @@ impl<T: Texture> Material for Dielectric<T> {
             };
         (
             interaction,
-            Some(Ray::new(rec.p, direction, r.time)),
+            Some(Ray::new(rec.p, direction)),
             Some(attenuation),
         )
     }

@@ -51,7 +51,7 @@ impl Hitable for ConstantMedium {
         }
         None
     }
-    fn bounding_box(&self, time0: f64, time1: f64) -> Option<AABB> {
-        self.boundary.bounding_box(time0, time1)
+    fn bounding_box(&self) -> Option<AABB> {
+        self.boundary.bounding_box()
     }
 }

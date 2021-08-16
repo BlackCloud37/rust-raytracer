@@ -5,7 +5,6 @@ use crate::objects::hit::{HitRecord, Hitable};
 use crate::vec3::degrees_to_radians;
 use crate::{Ray, Vec3};
 use kd_tree::KdTreeN;
-use rand::Rng;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
@@ -20,8 +19,6 @@ pub struct Camera {
     pub v: Vec3,
     pub w: Vec3,
     pub lens_radius: f64,
-    pub time0: f64,
-    pub time1: f64,
 }
 
 impl Camera {
@@ -32,10 +29,8 @@ impl Camera {
         aspect_ratio: f64,
         aperture: f64,
         focus_dist: f64,
-        time_range: (f64, f64),
     ) -> Self {
         let (look_from, look_at) = look_from_to;
-        let (time0, time1) = time_range;
         let theta = degrees_to_radians(vfov);
         let h = f64::tan(theta / 2.);
         let viewport_height = 2.0 * h;
@@ -57,19 +52,15 @@ impl Camera {
             v,
             w,
             lens_radius: aperture / 2.,
-            time0,
-            time1,
         }
     }
 
     pub fn get_ray(&self, s: f64, t: f64) -> Ray {
         let rd: Vec3 = self.lens_radius * Vec3::random_in_unit_disk();
         let offset: Vec3 = self.u * rd.x + self.v * rd.y;
-        let mut rng = rand::thread_rng();
         Ray::new(
             self.origin + offset,
             self.lower_left_corner + s * self.horizontal + t * self.vertical - self.origin - offset,
-            rng.gen_range(self.time0..self.time1),
         )
     }
 }
@@ -91,7 +82,7 @@ impl World {
         lights: Vec<Arc<dyn Light>>,
     ) -> Self {
         Self {
-            bvh: BVHNode::new(hitable_list, 0.0, 1.0),
+            bvh: BVHNode::new(hitable_list),
             cam,
             lights: AllLights::new(lights),
             global_pm: KdTreeN::default(),
@@ -181,8 +172,7 @@ impl World {
                     let mut global_flux = Vec3::zero();
                     const GATHER_CNT: usize = 4;
                     for _ in 0..GATHER_CNT {
-                        let diffuse_ray =
-                            Ray::new(rec.p, Vec3::random_in_hemisphere(&rec.normal), 0.);
+                        let diffuse_ray = Ray::new(rec.p, Vec3::random_in_hemisphere(&rec.normal));
                         if let Some(another_rec) = self.bvh.hit(&diffuse_ray, 0.0001, f64::INFINITY)
                         {
                             global_flux += World::estimate_flux(&self.global_pm, &another_rec, 25);
