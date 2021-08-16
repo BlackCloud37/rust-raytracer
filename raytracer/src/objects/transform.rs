@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use crate::objects::aabb::AABB;
 use crate::objects::hit::{HitRecord, Hitable};
-use crate::scene::degrees_to_radians;
+use crate::vec3::degrees_to_radians;
 use crate::{Ray, Vec3};
 use nalgebra::Matrix4;
 use std::sync::Arc;

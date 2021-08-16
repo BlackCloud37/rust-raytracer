@@ -3,8 +3,8 @@ use crate::objects::hit::{HitRecord, Hitable};
 use crate::material::{ConstantTexture, DiffuseLight};
 use crate::objects::aabb::AABB;
 use crate::objects::sphere::Sphere;
-use crate::scene::World;
 use crate::vec3::polar_direction;
+use crate::world::World;
 use crate::{Ray, Vec3};
 use kd_tree::KdPoint;
 use rand::distributions::Distribution;
@@ -31,9 +31,9 @@ impl Photon {
             power,
         }
     }
-    pub fn position(&self) -> Vec3 {
-        self.position
-    }
+    // pub fn position(&self) -> Vec3 {
+    //     self.position
+    // }
     pub fn power(&self) -> Vec3 {
         self.power
     }
@@ -108,7 +108,6 @@ impl Light for SphereDiffuseLight {
         self.scale * self.flux
     }
     fn sample_li(&self, rec: &HitRecord, world: &World, sample_cnt: usize) -> Vec3 {
-        // todo!(maybe bug)
         let mut sample_li = Vec3::zero();
         for _ in 0..sample_cnt {
             let center_to_p = (rec.p - self.sphere.center).unit();
@@ -118,11 +117,9 @@ impl Light for SphereDiffuseLight {
             let shadow_ray = Ray::new(rec.p, direct_to_light, 0.);
             let t = (rec.p - point_on_sphere).length();
             if world.bvh.hit(&shadow_ray, 0.0001, t - 0.0001).is_none() {
-                if let (_, _, Some(f)) = rec.mat.scatter(&shadow_ray, rec) {
-                    sample_li +=
-                        Vec3::elemul(self.flux, f) * (rec.normal.unit() * direct_to_light).max(0.0);
-                    // / (self.position - rec.p).length();
-                }
+                sample_li += Vec3::elemul(self.flux, rec.mat.bsdf(shadow_ray.dir, rec))
+                    * (rec.normal * direct_to_light).max(0.0);
+                // / (self.position - rec.p).length();
             }
         }
         sample_li / sample_cnt as f64

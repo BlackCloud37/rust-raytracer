@@ -6,6 +6,10 @@ use std::f64::consts::PI;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Index, Mul, MulAssign, Neg, Sub, SubAssign};
 
+pub fn degrees_to_radians(degrees: f64) -> f64 {
+    degrees * PI / 180.
+}
+
 #[derive(Clone, Debug, PartialEq, Copy)]
 pub struct Vec3 {
     pub x: f64,

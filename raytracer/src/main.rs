@@ -6,6 +6,7 @@ mod objects;
 mod ray;
 mod scene;
 mod vec3;
+mod world;
 
 use image::{ImageBuffer, Rgb, RgbImage};
 use indicatif::ProgressBar;

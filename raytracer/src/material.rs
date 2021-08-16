@@ -19,7 +19,7 @@ pub trait Texture: Send + Sync {
     fn get_color(&self, rec: &HitRecord) -> Vec3;
 }
 pub trait Material: Send + Sync {
-    fn bsdf(&self, ray_in: &Ray, rec: &HitRecord) -> Vec3;
+    fn bsdf(&self, r_dir: Vec3, rec: &HitRecord) -> Vec3;
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>);
     fn emitted(&self, _rec: &HitRecord) -> Vec3 {
         Vec3::zero()
@@ -105,12 +105,12 @@ impl<T: Texture> Lambertian<T> {
 }
 
 impl<T: Texture> Material for Lambertian<T> {
-    fn bsdf(&self, _ray_in: &Ray, rec: &HitRecord) -> Vec3 {
+    fn bsdf(&self, _r_dir: Vec3, rec: &HitRecord) -> Vec3 {
         self.albedo.get_color(rec) / PI
     }
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
         let scattered = Ray::new(rec.p, self.scattered_direction(rec.normal), r.time);
-        (Diffuse, Some(scattered), Some(self.bsdf(r, rec)))
+        (Diffuse, Some(scattered), Some(self.bsdf(r.dir, rec)))
     }
 }
 
@@ -126,7 +126,7 @@ impl<T: Texture> Metal<T> {
 }
 
 impl<T: Texture> Material for Metal<T> {
-    fn bsdf(&self, _ray_in: &Ray, rec: &HitRecord) -> Vec3 {
+    fn bsdf(&self, _r_dir: Vec3, rec: &HitRecord) -> Vec3 {
         self.albedo.get_color(rec)
     }
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
@@ -137,7 +137,7 @@ impl<T: Texture> Material for Metal<T> {
             r.time,
         );
         if scattered.dir * rec.normal > 0. {
-            (Specular, Some(scattered), Some(self.bsdf(r, rec)))
+            (Specular, Some(scattered), Some(self.bsdf(r.dir, rec)))
         } else {
             (Absorb, None, None)
         }
@@ -161,11 +161,11 @@ impl<T: Texture> Dielectric<T> {
 }
 
 impl<T: Texture> Material for Dielectric<T> {
-    fn bsdf(&self, _ray_in: &Ray, rec: &HitRecord) -> Vec3 {
+    fn bsdf(&self, _r_dir: Vec3, rec: &HitRecord) -> Vec3 {
         self.albedo.get_color(rec)
     }
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
-        let attenuation = self.bsdf(r, rec);
+        let attenuation = self.bsdf(r.dir, rec);
         let refraction_ratio = if rec.front_face {
             1.0 / self.ir
         } else {
@@ -205,7 +205,7 @@ impl<T: Texture> DiffuseLight<T> {
 }
 
 impl<T: Texture> Material for DiffuseLight<T> {
-    fn bsdf(&self, _ray_in: &Ray, _rec: &HitRecord) -> Vec3 {
+    fn bsdf(&self, _r_dir: Vec3, _rec: &HitRecord) -> Vec3 {
         Vec3::zero()
     }
     fn scatter(&self, _r: &Ray, _rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
