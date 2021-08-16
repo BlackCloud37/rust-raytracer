@@ -1,7 +1,8 @@
 use cached::proc_macro::cached;
 use image::{Rgb, Rgba};
 use nalgebra::{Matrix4, Matrix4x1};
-use rand::{thread_rng, Rng};
+// use rand::distributions::Uniform;
+use rand::Rng;
 use std::f64::consts::PI;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Index, Mul, MulAssign, Neg, Sub, SubAssign};
@@ -79,9 +80,9 @@ impl Vec3 {
     }
 
     pub fn unit(&self) -> Vec3 {
-        match self {
-            v if v.length() == 0. => panic!(),
-            _ => self / self.length(),
+        match self.length() {
+            l if l == 0. => panic!("unitizing zero vector"),
+            l => self / l,
         }
     }
 
@@ -104,21 +105,32 @@ impl Vec3 {
     }
 
     pub fn random_in_unit_sphere() -> Vec3 {
-        let mut rng = thread_rng();
-        let theta: f64 = rng.gen::<f64>() * 2. * PI;
-        let phi = f64::acos(rng.gen::<f64>() * 2. - 1.);
+        let mut rng = rand::thread_rng();
+        // let mut dist = Uniform::from(-1. ..1.);
+        let mut u: f64;
+        let mut v: f64;
+        let mut r2: f64;
+        loop {
+            u = rng.gen_range(-1. ..1.);
+            v = rng.gen_range(-1. ..1.);
+            r2 = u.powi(2) + v.powi(2);
+            if r2 <= 1. {
+                break;
+            }
+        }
         Vec3::new(
-            f64::cos(theta) * f64::sin(phi),
-            f64::sin(theta) * f64::sin(phi),
-            f64::cos(phi),
+            2. * u * (1. - r2).sqrt(),
+            2. * v * (1. - r2).sqrt(),
+            1. - 2. * r2,
         )
-        // loop {
-        //     let p = Vec3::random_in_range(-1., 1.);
-        //     if p.squared_length() >= 1. {
-        //         continue;
-        //     }
-        //     return p;
-        // }
+        // let mut rng = thread_rng();
+        // let theta: f64 = rng.gen::<f64>() * 2. * PI;
+        // let phi = f64::acos(rng.gen::<f64>() * 2. - 1.);
+        // Vec3::new(
+        //     f64::cos(theta) * f64::sin(phi),
+        //     f64::sin(theta) * f64::sin(phi),
+        //     f64::cos(phi),
+        // )
     }
 
     pub fn random_unit_vector() -> Vec3 {

@@ -163,13 +163,13 @@ impl World {
                     + Vec3::new(0., 1., 0.) * (within_caustic.len() as f64 / 50.);
             }
 
-            // let emission = Vec3::zero();
-            let emission = rec.mat.emitted(&rec); // todo!(emission from light source)
+            let emission = rec.mat.emitted(&rec);
             match rec.mat.scatter(&r, &rec) {
                 (Interaction::Diffuse, Some(_scattered), Some(attenuation)) => {
                     let caustic_flux = World::estimate_flux(&self.caustic_pm, &rec, 5);
                     // global
                     let mut global_flux = Vec3::zero();
+                    // todo!(uniform sample)
                     const GATHER_CNT: usize = 4;
                     for _ in 0..GATHER_CNT {
                         let diffuse_ray = Ray::new(rec.p, Vec3::random_in_hemisphere(&rec.normal));

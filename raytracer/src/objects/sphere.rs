@@ -2,7 +2,7 @@ use crate::material::Material;
 use crate::objects::aabb::AABB;
 use crate::objects::hit::{HitRecord, Hitable};
 use crate::{Ray, Vec3};
-use std::f64::consts::PI;
+use std::f64::consts::{FRAC_1_PI, PI};
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -16,7 +16,7 @@ impl Sphere {
     fn get_uv(&self, p: &Vec3) -> (f64, f64) {
         let theta = f64::acos(-p.y);
         let phi = f64::atan2(-p.z, p.x) + PI;
-        (phi / (2. * PI), theta / PI)
+        (phi * FRAC_1_PI * 0.5, theta * FRAC_1_PI)
     }
 }
 

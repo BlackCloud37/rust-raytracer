@@ -10,7 +10,7 @@ use kd_tree::KdPoint;
 use rand::distributions::Distribution;
 use rand::distributions::WeightedIndex;
 use rand::thread_rng;
-use std::f64::consts::PI;
+use std::f64::consts::{FRAC_1_PI, PI};
 use std::sync::Arc;
 
 pub struct Photon {
@@ -22,8 +22,9 @@ pub struct Photon {
 
 impl Photon {
     pub fn new(position: Vec3, power: Vec3, direction: Vec3) -> Self {
-        let phi = (255. * (f64::atan2(direction.y, direction.x) + PI) / (2. * PI)).floor() as u8;
-        let theta = (255. * f64::acos(direction.x) / PI).floor() as u8;
+        let phi =
+            (255. * (f64::atan2(direction.y, direction.x) + PI) * 0.5 * FRAC_1_PI).floor() as u8;
+        let theta = (255. * f64::acos(direction.x) * FRAC_1_PI).floor() as u8;
         Self {
             position,
             phi,

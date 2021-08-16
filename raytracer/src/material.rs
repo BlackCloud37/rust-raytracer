@@ -5,7 +5,7 @@ use crate::Ray;
 use crate::Vec3;
 use image::{DynamicImage, GenericImageView};
 use rand::Rng;
-use std::f64::consts::PI;
+use std::f64::consts::FRAC_1_PI;
 
 pub enum Interaction {
     Diffuse,
@@ -106,7 +106,7 @@ impl<T: Texture> Lambertian<T> {
 
 impl<T: Texture> Material for Lambertian<T> {
     fn bsdf(&self, _r_dir: Vec3, rec: &HitRecord) -> Vec3 {
-        self.albedo.get_color(rec) / PI
+        self.albedo.get_color(rec) * FRAC_1_PI
     }
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
         let scattered = Ray::new(rec.p, self.scattered_direction(rec.normal));
