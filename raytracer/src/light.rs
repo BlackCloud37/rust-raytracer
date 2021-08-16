@@ -1,5 +1,8 @@
 use crate::objects::hit::{HitRecord, Hitable};
 // use crate::objects::rectangle::XZRectangle;
+use crate::material::{ConstantTexture, DiffuseLight};
+use crate::objects::aabb::AABB;
+use crate::objects::sphere::Sphere;
 use crate::scene::World;
 use crate::vec3::polar_direction;
 use crate::{Ray, Vec3};
@@ -53,40 +56,76 @@ impl KdPoint for Photon {
     }
 }
 
-pub trait Light: Sync + Send {
+pub trait Light: Hitable {
     fn emit(&self) -> (Ray, Vec3); // ray, power
     fn power(&self) -> Vec3; // total power
-    fn sample_li(&self, rec: &HitRecord, world: &World) -> Vec3;
+    fn sample_li(&self, rec: &HitRecord, world: &World, sample_cnt: usize) -> Vec3;
 }
 
-pub struct SphereLight {
-    pub position: Vec3,
+#[derive(Clone)]
+pub struct SphereDiffuseLight {
+    sphere: Sphere,
     pub flux: Vec3,
     pub scale: f64,
 }
 
-impl Light for SphereLight {
+impl SphereDiffuseLight {
+    pub fn new(center: Vec3, radius: f64, flux: Vec3, scale: f64) -> Self {
+        Self {
+            sphere: Sphere {
+                center,
+                radius,
+                material: Arc::new(DiffuseLight::new(ConstantTexture(flux))),
+            },
+            flux,
+            scale,
+        }
+    }
+}
+
+impl Hitable for SphereDiffuseLight {
+    fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        self.sphere.hit(r, t_min, t_max)
+    }
+    fn bounding_box(&self, time0: f64, time1: f64) -> Option<AABB> {
+        self.sphere.bounding_box(time0, time1)
+    }
+}
+
+impl Light for SphereDiffuseLight {
     fn emit(&self) -> (Ray, Vec3) {
+        let dir = Vec3::random_in_unit_sphere();
         (
-            Ray::new(self.position, Vec3::random_in_unit_sphere(), 0.),
+            Ray::new(
+                self.sphere.center + dir * (self.sphere.radius + 0.0001),
+                dir,
+                0.,
+            ),
             self.flux * self.scale,
         )
     }
     fn power(&self) -> Vec3 {
         self.scale * self.flux
     }
-    fn sample_li(&self, rec: &HitRecord, world: &World) -> Vec3 {
+    fn sample_li(&self, rec: &HitRecord, world: &World, sample_cnt: usize) -> Vec3 {
         // todo!(maybe bug)
-        let direct_to_light = (self.position - rec.p).unit();
-        let shadow_ray = Ray::new(rec.p, direct_to_light, 0.);
-        let t = (rec.p - self.position).length();
-        if world.bvh.hit(&shadow_ray, 0.0001, t - 0.0001).is_none() {
-            if let (_, _, Some(f)) = rec.mat.scatter(&shadow_ray, rec) {
-                return Vec3::elemul(self.flux, f) * (rec.normal.unit() * direct_to_light).max(0.0);
-                // / (self.position - rec.p).length();
+        let mut sample_li = Vec3::zero();
+        for _ in 0..sample_cnt {
+            let center_to_p = (rec.p - self.sphere.center).unit();
+            let point_on_sphere =
+                self.sphere.center + Vec3::random_in_hemisphere(&center_to_p) * self.sphere.radius;
+            let direct_to_light = (point_on_sphere - rec.p).unit();
+            let shadow_ray = Ray::new(rec.p, direct_to_light, 0.);
+            let t = (rec.p - point_on_sphere).length();
+            if world.bvh.hit(&shadow_ray, 0.0001, t - 0.0001).is_none() {
+                if let (_, _, Some(f)) = rec.mat.scatter(&shadow_ray, rec) {
+                    sample_li +=
+                        Vec3::elemul(self.flux, f) * (rec.normal.unit() * direct_to_light).max(0.0);
+                    // / (self.position - rec.p).length();
+                }
             }
         }
-        Vec3::zero()
+        sample_li / sample_cnt as f64
     }
 }
 
@@ -139,17 +178,20 @@ impl AllLights {
     }
 }
 
-impl Light for AllLights {
-    fn emit(&self) -> (Ray, Vec3) {
+impl AllLights {
+    pub fn emit(&self) -> (Ray, Vec3) {
         let mut rng = thread_rng();
         let light_dist = WeightedIndex::new(&self.lights_prob).unwrap();
         let idx: usize = light_dist.sample(&mut rng);
         self.lights[idx].emit()
     }
-    fn power(&self) -> Vec3 {
-        self.lights.iter().map(|l| l.power()).sum()
-    }
-    fn sample_li(&self, rec: &HitRecord, world: &World) -> Vec3 {
-        self.lights.iter().map(|l| l.sample_li(rec, world)).sum()
+    // pub fn power(&self) -> Vec3 {
+    //     self.lights.iter().map(|l| l.power()).sum()
+    // }
+    pub fn sample_li(&self, rec: &HitRecord, world: &World, sample_cnt: usize) -> Vec3 {
+        self.lights
+            .iter()
+            .map(|l| l.sample_li(rec, world, sample_cnt))
+            .sum()
     }
 }

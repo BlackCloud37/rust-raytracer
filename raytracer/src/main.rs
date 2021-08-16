@@ -14,6 +14,7 @@ pub use ray::Ray;
 use scene::select_scene;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
+// use std::time::SystemTime;
 use threadpool::ThreadPool;
 pub use vec3::Vec3;
 
@@ -27,7 +28,7 @@ fn main() {
 
     // jobs: split image into how many parts
     // workers: maximum allowed concurrent running threads
-    let (n_jobs, n_workers): (usize, usize) = if is_ci { (32, 2) } else { (16, 2) };
+    let (n_jobs, n_workers): (usize, usize) = if is_ci { (32, 2) } else { (64, 4) };
 
     println!(
         "CI: {}, using {} jobs and {} workers",
@@ -36,11 +37,11 @@ fn main() {
 
     // Image
     let aspect_ratio = 16. / 9.;
-    let width = 800;
+    let width = 1024;
     let height = (width as f64 / aspect_ratio) as u32;
 
-    let max_depth = 40;
-    let samples_per_pixel = 64;
+    let max_depth = 25;
+    let samples_per_pixel = 16;
     // create a channel to send objects between threads
     let (tx, rx) = channel();
     let pool = ThreadPool::new(n_workers);
@@ -99,6 +100,8 @@ fn main() {
         bar.inc(1);
     }
 
+    // let timestamp = SystemTime::now();
+    // let time_str = format!("{}", );
     result.save("output/test.png").unwrap();
     bar.finish();
 }

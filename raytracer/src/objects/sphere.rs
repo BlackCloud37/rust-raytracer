@@ -5,6 +5,7 @@ use crate::{Ray, Vec3};
 use std::f64::consts::PI;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct Sphere {
     pub center: Vec3,
     pub radius: f64,

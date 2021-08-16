@@ -1,7 +1,5 @@
-use crate::light::{AllLights, Light, Photon, SphereLight};
-use crate::material::{
-    ConstantTexture, Dielectric, DiffuseLight, Interaction, Lambertian, Material, Metal,
-};
+use crate::light::{AllLights, Light, Photon, SphereDiffuseLight};
+use crate::material::{ConstantTexture, Dielectric, Interaction, Lambertian, Material, Metal};
 use crate::objects::bvh::BVHNode;
 // use crate::objects::cube::Cube;
 use crate::objects::hit::{HitRecord, Hitable};
@@ -9,13 +7,14 @@ use crate::objects::hit::{HitRecord, Hitable};
 use crate::objects::rectangle::{XYRectangle, XZRectangle, YZRectangle};
 use crate::objects::sphere::Sphere;
 // use crate::objects::transform::Transform;
+// use crate::vec3::polar_direction;
 use crate::{Ray, Vec3};
 use kd_tree::KdTreeN;
 use rand::Rng;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
-const N_PHOTONS: usize = 100000;
+const N_PHOTONS: usize = 400000;
 // const N_NEAREST: usize = 50;
 pub struct Camera {
     pub origin: Vec3,
@@ -183,25 +182,32 @@ impl World {
                 let (x, y, z) = rec.p.xyz();
                 let within_global = self.global_pm.within_radius(&[x, y, z], 3.);
                 let within_caustic = self.caustic_pm.within_radius(&[x, y, z], 3.);
-                return Vec3::new(1., 0., 0.) * (within_global.len() as f64 / 100.)
-                    + Vec3::new(0., 1., 0.) * (within_caustic.len() as f64 / 100.);
+                return Vec3::new(1., 0., 0.) * (within_global.len() as f64 / 50.)
+                    + Vec3::new(0., 1., 0.) * (within_caustic.len() as f64 / 50.);
             }
 
             // let emission = Vec3::zero();
             let emission = rec.mat.emitted(&rec); // todo!(emission from light source)
             match rec.mat.scatter(&r, &rec) {
-                (Interaction::Diffuse, Some(scattered), Some(attenuation)) => {
-                    let caustic_flux = World::estimate_flux(&self.caustic_pm, &rec, 10);
+                (Interaction::Diffuse, Some(_scattered), Some(attenuation)) => {
+                    let caustic_flux = World::estimate_flux(&self.caustic_pm, &rec, 5);
                     // global
-                    // let diffuse_ray = Ray::new(rec.p, Vec3::random_in_hemisphere(&rec.normal), 0.);
-                    // let global_flux = World::estimate_flux(&self.global_pm, &rec, 100);
                     let mut global_flux = Vec3::zero();
-                    if let Some(another_rec) = self.bvh.hit(&scattered, 0.0001, f64::INFINITY) {
-                        global_flux = World::estimate_flux(&self.global_pm, &another_rec, 100);
+                    const GATHER_CNT: usize = 4;
+                    for _ in 0..GATHER_CNT {
+                        let diffuse_ray =
+                            Ray::new(rec.p, Vec3::random_in_hemisphere(&rec.normal), 0.);
+                        if let Some(another_rec) = self.bvh.hit(&diffuse_ray, 0.0001, f64::INFINITY)
+                        {
+                            global_flux += World::estimate_flux(&self.global_pm, &another_rec, 25);
+                        }
                     }
+                    global_flux /= GATHER_CNT as f64;
                     global_flux = Vec3::elemul(global_flux, attenuation);
-                    // emission + Vec3::elemul(attenuation, self.ray_color_pm(scattered, depth - 1))
-                    self.lights.sample_li(&rec, self) + emission + caustic_flux + global_flux
+                    self.lights.sample_li(&rec, self, 8) + emission + caustic_flux + global_flux
+                    // emission + caustic_flux + global_flux
+                    // emission + caustic_flux
+                    // emission + global_flux
                 }
                 (_, Some(scattered), Some(attenuation)) => {
                     emission + Vec3::elemul(attenuation, self.ray_color_pm(scattered, depth - 1))
@@ -214,95 +220,6 @@ impl World {
     }
 }
 
-fn random_scene() -> World {
-    // use image::io::Reader as ImageReader;
-    // let res = ImageReader::open("texture/earthmap.jpg");
-    // if res.is_err() {
-    //     panic!("Err reading texture")
-    // }
-    // let decode_res = res.unwrap().decode();
-    // if decode_res.is_err() {
-    //     panic!("Err reading texture")
-    // }
-    // let img = decode_res.unwrap();
-    // let mut hitable_list: Vec<Arc<dyn Hitable>> = vec![
-    //     Arc::new(Sphere {
-    //         center: Vec3::new(0., -1000., 0.),
-    //         radius: 1000.,
-    //         material: Arc::new(Lambertian::new(CheckerTexture(
-    //             ConstantTexture(Vec3::new(0.2, 0.3, 0.1)),
-    //             ConstantTexture(Vec3::new(0.9, 0.9, 0.9)),
-    //         ))),
-    //     }),
-    //     Arc::new(Sphere {
-    //         center: Vec3::new(0., 1., 0.),
-    //         radius: 1.,
-    //         material: Arc::new(Lambertian::new(ImageTexture(img))),
-    //     }),
-    //     Arc::new(Sphere {
-    //         center: Vec3::new(-4., 1., 0.),
-    //         radius: 1.,
-    //         material: Arc::new(DiffuseLight::new(ConstantTexture(Vec3::new(4., 4., 4.)))),
-    //     }),
-    //     Arc::new(Sphere {
-    //         center: Vec3::new(4., 1., 0.),
-    //         radius: 1.,
-    //         material: Arc::new(Metal::new(ConstantTexture(Vec3::new(0.7, 0.6, 0.5)), 0.)),
-    //     }),
-    // ];
-    // let mut rng = rand::thread_rng();
-    // for a in -11..12 {
-    //     for b in -11..12 {
-    //         let choose_mat: f64 = rng.gen();
-    //         let center = Vec3::new(
-    //             f64::from(a) + 0.9_f64 * rng.gen::<f64>(),
-    //             0.2,
-    //             f64::from(b) + 0.9_f64 * rng.gen::<f64>(),
-    //         );
-    //         if (center - Vec3::new(4., 0.2, 0.)).length() > 0.9 {
-    //             if choose_mat < 0.8 {
-    //                 // diffuse
-    //                 let albedo = Vec3::random_in_range(0., 1.);
-    //                 hitable_list.push(Arc::new(Sphere {
-    //                     center,
-    //                     radius: 0.2,
-    //                     material: Arc::new(Lambertian::new(ConstantTexture(albedo))),
-    //                 }));
-    //             } else if choose_mat < 0.95 {
-    //                 // metal
-    //                 let albedo = Vec3::random_in_range(0.5, 1.);
-    //                 let fuzz: f64 = rng.gen_range(0.0..0.5);
-    //                 hitable_list.push(Arc::new(Sphere {
-    //                     center,
-    //                     radius: 0.2,
-    //                     material: Arc::new(Metal::new(ConstantTexture(albedo), fuzz)),
-    //                 }))
-    //             } else {
-    //                 // glass
-    //                 hitable_list.push(Arc::new(Sphere {
-    //                     center,
-    //                     radius: 0.2,
-    //                     material: Arc::new(Dielectric::new(1.5)),
-    //                 }))
-    //             }
-    //         }
-    //     }
-    // }
-    World::new(
-        vec![],
-        Camera::new(
-            (Vec3::new(13., 2., 3.), Vec3::new(0., 0., 0.)),
-            Vec3::new(0., 1., 0.),
-            20.,
-            16. / 9.,
-            0.0,
-            10.0,
-            (0.0, 1.0),
-        ),
-        vec![],
-    )
-}
-
 fn cornell_box_scene() -> World {
     let red: Arc<dyn Material> = Arc::new(Lambertian::new(ConstantTexture(Vec3::new(
         0.65, 0.05, 0.05,
@@ -313,8 +230,13 @@ fn cornell_box_scene() -> World {
     let green: Arc<dyn Material> = Arc::new(Lambertian::new(ConstantTexture(Vec3::new(
         0.12, 0.45, 0.15,
     ))));
-    let light: Arc<dyn Material> =
-        Arc::new(DiffuseLight::new(ConstantTexture(Vec3::new(1., 1., 1.))));
+    let light = SphereDiffuseLight::new(
+        Vec3::new(275., 550., 275.),
+        50.,
+        Vec3::new(4., 4., 4.),
+        20000000.,
+    );
+
     let hitable_list: Vec<Arc<dyn Hitable>> = vec![
         Arc::new(YZRectangle {
             yz0: (0.0, 0.0),
@@ -328,12 +250,12 @@ fn cornell_box_scene() -> World {
             x: 0.,
             material: Arc::clone(&green),
         }),
-        Arc::new(XZRectangle {
-            xz0: (113., 127.),
-            xz1: (443., 432.),
-            y: 554.,
-            material: Arc::clone(&light),
-        }),
+        // Arc::new(XZRectangle {
+        //     xz0: (113., 127.),
+        //     xz1: (443., 432.),
+        //     y: 554.,
+        //     material: Arc::clone(&light),
+        // }),
         Arc::new(XZRectangle {
             xz0: (0., 0.),
             xz1: (555., 555.),
@@ -367,6 +289,7 @@ fn cornell_box_scene() -> World {
             radius: 60.,
             material: Arc::new(Metal::new(ConstantTexture(Vec3::ones()), 0.)),
         }),
+        Arc::new(light.clone()),
     ];
 
     World::new(
@@ -380,24 +303,10 @@ fn cornell_box_scene() -> World {
             10.0,
             (0.0, 1.0),
         ),
-        vec![
-            Arc::new(SphereLight {
-                position: Vec3::new(275., 553., 275.),
-                flux: Vec3::new(0.5, 0.5, 0.5),
-                scale: 5000000.,
-            }),
-            // Arc::new(SphereLight {
-            //     position: Vec3::new(450., 500., 275.),
-            //     flux: Vec3::new(1., 1., 1.),
-            //     scale: 500000.,
-            // }),
-        ],
+        vec![Arc::new(light)],
     )
 }
 
-pub fn select_scene(index: usize) -> World {
-    match index {
-        0 => cornell_box_scene(),
-        _ => random_scene(),
-    }
+pub fn select_scene(_index: usize) -> World {
+    cornell_box_scene()
 }
