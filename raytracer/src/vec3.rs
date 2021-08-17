@@ -51,6 +51,10 @@ impl Vec3 {
         (self.x, self.y, self.z)
     }
 
+    pub fn xyz_arr(&self) -> [f64; 3] {
+        [self.x, self.y, self.z]
+    }
+
     pub fn max(&self) -> f64 {
         self.x.max(self.y).max(self.z)
     }
@@ -199,7 +203,11 @@ pub fn polar_direction(theta: u8, phi: u8) -> Vec3 {
 //         Vec3::new()
 //     }
 // }
-
+// impl Sum for Vec3 {
+//     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+//         iter.fold(Vec3::zero(), |a, b| a + b)
+//     }
+// }
 impl Index<usize> for Vec3 {
     type Output = f64;
     fn index(&self, index: usize) -> &Self::Output {

@@ -16,6 +16,8 @@ use scene::select_scene;
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 // use std::time::SystemTime;
+use crate::world::PMType::{Caustic, Global};
+use crate::world::PhotonMap;
 use threadpool::ThreadPool;
 pub use vec3::Vec3;
 
@@ -51,7 +53,10 @@ fn main() {
 
     // use Arc to pass one instance of World to multiple threads
     let world = select_scene(0);
-    let (global_pm, caustic_pm) = world.map_photons();
+    let mut global_pm = PhotonMap::new(Global);
+    let mut caustic_pm = PhotonMap::new(Caustic);
+    world.gen_photon_maps(400000, &mut global_pm, &mut caustic_pm);
+    // let [global_pm, caustic_pm] = world.gen_photon_maps(400000);
     let world = Arc::new(world);
     let (global_pm, caustic_pm) = (Arc::new(global_pm), Arc::new(caustic_pm));
 

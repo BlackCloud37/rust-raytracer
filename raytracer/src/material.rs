@@ -89,18 +89,16 @@ impl Texture for ImageTexture {
 pub struct Lambertian<T: Texture> {
     pub albedo: T,
 }
-
+fn scattered_direction(n: Vec3) -> Vec3 {
+    let mut scatter_direction = n + Vec3::random_unit_vector();
+    if scatter_direction.is_near_zero() {
+        scatter_direction = n;
+    }
+    scatter_direction
+}
 impl<T: Texture> Lambertian<T> {
     pub fn new(albedo: T) -> Self {
         Self { albedo }
-    }
-
-    fn scattered_direction(&self, n: Vec3) -> Vec3 {
-        let mut scatter_direction = n + Vec3::random_unit_vector();
-        if scatter_direction.is_near_zero() {
-            scatter_direction = n;
-        }
-        scatter_direction
     }
 }
 
@@ -109,7 +107,7 @@ impl<T: Texture> Material for Lambertian<T> {
         self.albedo.get_color(rec) * FRAC_1_PI
     }
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
-        let scattered = Ray::new(rec.p, self.scattered_direction(rec.normal));
+        let scattered = Ray::new(rec.p, scattered_direction(rec.normal));
         (Diffuse, Some(scattered), Some(self.bsdf(r.dir, rec)))
     }
 }
@@ -202,10 +200,11 @@ impl<T: Texture> DiffuseLight<T> {
 
 impl<T: Texture> Material for DiffuseLight<T> {
     fn bsdf(&self, _r_dir: Vec3, _rec: &HitRecord) -> Vec3 {
-        Vec3::zero()
+        Vec3::ones() * FRAC_1_PI
     }
-    fn scatter(&self, _r: &Ray, _rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
-        (Absorb, None, None)
+    fn scatter(&self, r: &Ray, rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
+        let scattered = Ray::new(rec.p, scattered_direction(rec.normal));
+        (Diffuse, Some(scattered), Some(self.bsdf(r.dir, rec)))
     }
     fn emitted(&self, rec: &HitRecord) -> Vec3 {
         self.emit.get_color(rec)
