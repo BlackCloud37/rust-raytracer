@@ -18,10 +18,10 @@ fn cornell_box_scene() -> World {
         0.12, 0.45, 0.15,
     ))));
     let light = SphereDiffuseLight::new(
-        Vec3::new(275., 550., 275.),
+        Vec3::new(275., 575., 275.),
         50.,
-        Vec3::new(3., 3., 3.),
-        30000000.,
+        Vec3::new(1., 1., 1.),
+        15000000.,
     );
 
     let hitable_list: Vec<Arc<dyn Hitable>> = vec![
@@ -61,16 +61,22 @@ fn cornell_box_scene() -> World {
             z: 555.,
             material: Arc::clone(&white),
         }),
+        Arc::new(XYRectangle {
+            xy0: (-10000., -10000.),
+            xy1: (10000., 10000.),
+            z: -801.,
+            material: Arc::clone(&white),
+        }),
         Arc::new(Sphere {
             center: Vec3::new(200., 120., 300.),
             radius: 120.,
             material: Arc::new(Dielectric::new(1.5, ConstantTexture(Vec3::ones()))),
         }),
-        Arc::new(Sphere {
-            center: Vec3::new(90., 90., 150.),
-            radius: 90.,
-            material: Arc::clone(&white),
-        }),
+        // Arc::new(Sphere {
+        //     center: Vec3::new(90., 90., 150.),
+        //     radius: 90.,
+        //     material: Arc::clone(&white),
+        // }),
         Arc::new(Sphere {
             center: Vec3::new(450., 60., 200.),
             radius: 60.,
@@ -85,7 +91,7 @@ fn cornell_box_scene() -> World {
             (Vec3::new(278., 278., -800.), Vec3::new(278., 278., 278.)),
             Vec3::new(0., 1., 0.),
             40.,
-            16. / 9.,
+            1.,
             0.0,
             10.0,
         ),

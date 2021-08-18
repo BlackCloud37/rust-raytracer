@@ -4,6 +4,7 @@ use crate::material::Interaction;
 use crate::objects::bvh::BVHNode;
 use crate::objects::hit::{HitRecord, Hitable};
 use crate::vec3::degrees_to_radians;
+use crate::world::PMType::{Caustic, Global};
 use crate::{Ray, Vec3};
 use kd_tree::KdTreeN;
 use std::f64::consts::PI;
@@ -11,7 +12,9 @@ use std::sync::Arc;
 
 // const N_PHOTONS: usize = 400000;
 // const N_NEAREST: usize = 50;
-const GATHER_CNT: usize = 4;
+const ALPHA: f64 = 0.7;
+const GATHER_CNT: usize = 1;
+// const FRAC_1_K: f64 = 1. / 10.;
 const FRAC_1_GATHER_CNT: f64 = 1. / GATHER_CNT as f64;
 pub enum PMType {
     Global,
@@ -19,20 +22,36 @@ pub enum PMType {
 }
 
 pub struct PhotonMap {
-    pm_type: PMType,
+    pub pm_type: PMType,
     pub map: Option<KdTreeN<Photon, typenum::U3>>,
-    n_emitted: usize,
+    pub n_emitted: usize,
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct SPPM {
+    pub flux: Vec3,
+    pub radius2: f64,
+    pub photons: usize,
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct SPPMPixel {
+    pub global: [SPPM; GATHER_CNT],
+    pub caustic: SPPM,
 }
 
 impl PhotonMap {
-    pub fn new(pm_type: PMType) -> Self {
+    pub fn new(pm_type: PMType, n_emitted: usize) -> Self {
         Self {
             pm_type,
             map: None,
-            n_emitted: 0,
+            n_emitted,
         }
     }
 
+    fn disk_factor(rec: &HitRecord, photon: &Photon) -> f64 {
+        (*photon.norm() * (*photon.position() - rec.p).unit()).abs()
+    }
     /// KNN Estimate
     /// return (flux, radius2)
     pub fn estimate_flux_by_count(&self, rec: &HitRecord, n_nearest: usize) -> (Vec3, f64) {
@@ -47,9 +66,32 @@ impl PhotonMap {
             } in nearest.into_iter()
             {
                 radius2 = radius2.max(squared_distance);
-                flux += Vec3::elemul(rec.mat.bsdf(*photon.direction(), &rec), *photon.power());
+                let disk_factor = PhotonMap::disk_factor(rec, photon);
+                flux += Vec3::elemul(rec.mat.bsdf(*photon.direction(), &rec), *photon.power())
+                    * (1. - disk_factor);
+                // * (1. - (squared_distance / radius2).sqrt() * FRAC_1_K);
             }
             (flux, radius2)
+        } else {
+            panic!("photon map not built yet")
+        }
+    }
+
+    /// return (flux, photon_cnt)
+    pub fn estimate_flux_within_radius(&self, rec: &HitRecord, radius: f64) -> (Vec3, usize) {
+        // let frac_1_radius = 1. / radius;
+
+        if let Some(pm) = self.map.as_ref() {
+            let p = rec.p.xyz_arr();
+            let nearest = pm.within_radius(&p, radius);
+            let mut flux = Vec3::zero();
+            let photons = nearest.len();
+            for photon in nearest {
+                let disk_factor = PhotonMap::disk_factor(rec, photon);
+                flux += Vec3::elemul(rec.mat.bsdf(*photon.direction(), &rec), *photon.power())
+                    * (1. - disk_factor);
+            }
+            (flux, photons)
         } else {
             panic!("photon map not built yet")
         }
@@ -145,17 +187,18 @@ impl World {
 
         // trace photon
         for _ in 0..n_emit_photons {
-            let (mut ray, mut power) = self.lights.emit();
+            let (mut ray, mut power, norm) = self.lights.emit();
+            all_photons.push(Photon::new(ray.orig, power, ray.dir, norm)); // todo!(check)
             let (mut has_specular, mut has_diffuse) = (false, false);
             while let Some(rec) = self.bvh.hit(&ray, 0.0001, f64::INFINITY) {
                 // hit sth., record if diffuse and update power/ray
                 let (interaction, out_ray, new_power) = rec.mat.scatter_photon(&ray, &rec, power);
                 match interaction {
                     Interaction::Diffuse => {
-                        all_photons.push(Photon::new(rec.p, power, ray.dir));
+                        all_photons.push(Photon::new(rec.p, power, ray.dir, rec.normal));
                         if !has_diffuse && has_specular {
                             // LS+D only
-                            caustic_photons.push(Photon::new(rec.p, power, ray.dir))
+                            caustic_photons.push(Photon::new(rec.p, power, ray.dir, rec.normal))
                         }
                         has_diffuse = true;
                     }
@@ -180,14 +223,35 @@ impl World {
         caustic_pm.map = Some(kd_tree::KdTree::build_by_ordered_float(caustic_photons));
     }
 
+    fn update_sppm(pm_type: PMType, rec: &HitRecord, sppm: &mut SPPM, pm: &PhotonMap) {
+        if sppm.photons == 0 {
+            sppm.photons = match pm_type {
+                Global => 50,
+                _ => 10,
+            };
+            let (flux, r2) = pm.estimate_flux_by_count(&rec, sppm.photons);
+            sppm.flux = flux;
+            sppm.radius2 = r2;
+        } else {
+            let (flux, photons) = pm.estimate_flux_within_radius(rec, sppm.radius2.sqrt());
+            let prev_photons = sppm.photons;
+            sppm.photons += (ALPHA * photons as f64) as usize;
+            let frac = sppm.photons as f64 / (prev_photons + photons) as f64;
+            sppm.radius2 *= frac;
+            sppm.flux = (sppm.flux + flux) * frac;
+        }
+    }
+
     pub fn ray_color_pm(
         &self,
         r: Ray,
         depth: i32,
         global_pm: &PhotonMap,
         caustic_pm: &PhotonMap,
+        sppm_pixel: &mut SPPMPixel,
     ) -> Vec3 {
         let debug_render_pm = false;
+        let method_pmpt = false;
         if depth <= 0 {
             return Vec3::zero();
         }
@@ -211,41 +275,46 @@ impl World {
             let emission = rec.mat.emitted(&rec);
             match rec.mat.scatter(&r, &rec) {
                 (Interaction::Diffuse, Some(_scattered), Some(attenuation)) => {
-                    let (caustic_flux, caustic_radius2) =
-                        caustic_pm.estimate_flux_by_count(&rec, 10);
-                    let caustic_flux = caustic_pm.adjust_flux(caustic_flux, caustic_radius2);
+                    World::update_sppm(Caustic, &rec, &mut sppm_pixel.caustic, caustic_pm);
+                    let caustic_flux =
+                        caustic_pm.adjust_flux(sppm_pixel.caustic.flux, sppm_pixel.caustic.radius2);
 
-                    // let (global_flux, global_radius2) = global_pm.estimate_flux_by_count(&rec, 100);
-                    // let global_flux = global_pm.adjust_flux(global_flux, global_radius2);
-
-                    let mut global_flux = (0..GATHER_CNT)
-                        .map(|_| {
+                    let mut global_flux = Vec3::zero();
+                    if method_pmpt {
+                        for global_sppm in sppm_pixel.global.iter_mut() {
+                            // let diffuse_ray = Ray::new(rec.p, Vec3::new(0., 1., 0.));
                             let diffuse_ray =
-                                Ray::new(rec.p, Vec3::random_in_hemisphere(&rec.normal)); //todo(uniform)
-                            self.bvh.hit(&diffuse_ray, 0.0001, f64::INFINITY)
-                        })
-                        .map(|hit_result| match hit_result {
-                            Some(another_rec) => {
-                                let (f, r2) = global_pm.estimate_flux_by_count(&another_rec, 25);
-                                f / r2
+                                Ray::new(rec.p, Vec3::random_in_hemisphere(&rec.normal));
+                            if let Some(another_rec) =
+                                self.bvh.hit(&diffuse_ray, 0.0001, f64::INFINITY)
+                            {
+                                World::update_sppm(Global, &another_rec, global_sppm, global_pm);
+                                global_flux +=
+                                    global_pm.adjust_flux(global_sppm.flux, global_sppm.radius2);
                             }
-                            None => Vec3::zero(),
-                        })
-                        .sum();
-                    global_flux *= FRAC_1_GATHER_CNT;
-                    global_flux = global_pm.adjust_flux(global_flux, 1.);
-                    global_flux = Vec3::elemul(global_flux, attenuation);
-
-                    self.lights.sample_li(&rec, self, 10) + emission + caustic_flux + global_flux
-                    // emission + caustic_flux + global_flux
-                    // emission + caustic_flux
-                    // emission + global_flux
+                        }
+                        global_flux *= FRAC_1_GATHER_CNT;
+                        global_flux = Vec3::elemul(attenuation, global_flux);
+                        self.lights.sample_li(&rec, self, 1) + emission + caustic_flux + global_flux
+                        // emission + caustic_flux + global_flux
+                    } else {
+                        World::update_sppm(Global, &rec, &mut sppm_pixel.global[0], global_pm);
+                        global_flux = global_pm
+                            .adjust_flux(sppm_pixel.global[0].flux, sppm_pixel.global[0].radius2);
+                        caustic_flux + global_flux + emission
+                    }
                 }
                 (_, Some(scattered), Some(attenuation)) => {
                     emission
                         + Vec3::elemul(
                             attenuation,
-                            self.ray_color_pm(scattered, depth - 1, global_pm, caustic_pm),
+                            self.ray_color_pm(
+                                scattered,
+                                depth - 1,
+                                global_pm,
+                                caustic_pm,
+                                sppm_pixel,
+                            ),
                         )
                 }
                 _ => emission,

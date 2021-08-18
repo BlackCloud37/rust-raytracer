@@ -11,7 +11,7 @@ pub fn degrees_to_radians(degrees: f64) -> f64 {
     degrees * PI / 180.
 }
 
-#[derive(Clone, Debug, PartialEq, Copy)]
+#[derive(Clone, Debug, PartialEq, Copy, Default)]
 pub struct Vec3 {
     pub x: f64,
     pub y: f64,

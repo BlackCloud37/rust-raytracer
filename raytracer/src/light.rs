@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::objects::hit::{HitRecord, Hitable};
 // use crate::objects::rectangle::XZRectangle;
 use crate::material::{ConstantTexture, DiffuseLight};
@@ -13,14 +14,16 @@ use rand::thread_rng;
 // use std::f64::consts::{FRAC_1_PI, PI};
 use std::sync::Arc;
 
+#[derive(Default)]
 pub struct Photon {
     position: Vec3,
     power: Vec3,
     direction: Vec3,
+    norm: Vec3,
 }
 
 impl Photon {
-    pub fn new(position: Vec3, power: Vec3, direction: Vec3) -> Self {
+    pub fn new(position: Vec3, power: Vec3, direction: Vec3, norm: Vec3) -> Self {
         // let phi =
         //     (255. * (f64::atan2(direction.y, direction.x) + PI) * 0.5 * FRAC_1_PI).floor() as u8;
         // let theta = (255. * f64::acos(direction.x) * FRAC_1_PI).floor() as u8;
@@ -28,11 +31,12 @@ impl Photon {
             position,
             power,
             direction,
+            norm,
         }
     }
-    // pub fn position(&self) -> Vec3 {
-    //     self.position
-    // }
+    pub fn position(&self) -> &Vec3 {
+        &self.position
+    }
     pub fn power(&self) -> &Vec3 {
         &self.power
     }
@@ -40,11 +44,8 @@ impl Photon {
         &self.direction
         // polar_direction(self.theta, self.phi)
     }
-}
-
-impl Default for Photon {
-    fn default() -> Self {
-        Photon::new(Vec3::zero(), Vec3::zero(), Vec3::zero())
+    pub fn norm(&self) -> &Vec3 {
+        &self.norm
     }
 }
 
@@ -57,7 +58,7 @@ impl KdPoint for Photon {
 }
 
 pub trait Light: Hitable {
-    fn emit(&self) -> (Ray, Vec3); // ray, power
+    fn emit(&self) -> (Ray, Vec3, Vec3); // ray, power, norm
     fn power(&self) -> Vec3; // total power
     fn sample_li(&self, rec: &HitRecord, world: &World, sample_cnt: usize) -> Vec3;
 }
@@ -93,15 +94,11 @@ impl Hitable for SphereDiffuseLight {
 }
 
 impl Light for SphereDiffuseLight {
-    fn emit(&self) -> (Ray, Vec3) {
-        let dir = Vec3::random_in_unit_sphere();
-        (
-            Ray::new(
-                self.sphere.center + dir * (self.sphere.radius + 0.0001),
-                dir,
-            ),
-            self.flux * self.scale,
-        )
+    fn emit(&self) -> (Ray, Vec3, Vec3) {
+        let norm = Vec3::random_in_unit_sphere();
+        let point_on_sphere = self.sphere.center + norm * (self.sphere.radius + 0.0001);
+        let dir = Vec3::random_in_hemisphere(&norm);
+        (Ray::new(point_on_sphere, dir), self.flux * self.scale, norm)
     }
     fn power(&self) -> Vec3 {
         self.scale * self.flux
@@ -118,8 +115,8 @@ impl Light for SphereDiffuseLight {
             let t = (rec.p - point_on_sphere).length();
             if world.bvh.hit(&shadow_ray, 0.0001, t - 0.0001).is_none() {
                 sample_li += Vec3::elemul(self.flux, rec.mat.bsdf(shadow_ray.dir, rec))
-                    * (rec.normal * direct_to_light).max(0.0)
-                    / (t * t * 0.00005);
+                    * (rec.normal * direct_to_light).max(0.0);
+                // / (t * t * 0.00005);
             }
         }
         sample_li / shadow_rays as f64
@@ -176,7 +173,7 @@ impl AllLights {
 }
 
 impl AllLights {
-    pub fn emit(&self) -> (Ray, Vec3) {
+    pub fn emit(&self) -> (Ray, Vec3, Vec3) {
         let mut rng = thread_rng();
         let light_dist = WeightedIndex::new(&self.lights_prob).unwrap();
         let idx: usize = light_dist.sample(&mut rng);
