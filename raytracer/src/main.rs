@@ -18,6 +18,7 @@ use std::sync::{Arc, Mutex};
 // use std::time::SystemTime;
 use crate::world::PMType::{Caustic, Global};
 use crate::world::{PhotonMap, SPPMPixel};
+use std::time::SystemTime;
 use threadpool::ThreadPool;
 pub use vec3::Vec3;
 
@@ -44,7 +45,7 @@ fn main() {
     let height = (width as f64 / aspect_ratio) as u32;
 
     let max_depth = 25;
-    let max_iter_cnt = 100;
+    let max_iter_cnt = 10;
 
     // create a channel to send objects between threads
     let (tx, rx) = channel();
@@ -57,8 +58,11 @@ fn main() {
     let sppm_pixels = vec![vec![SPPMPixel::default(); height as usize]; width];
     let sppm_pixels = Arc::new(Mutex::new(sppm_pixels));
 
+    let mut iter_durations = Vec::new();
+    let start_time = SystemTime::now();
     let mut total_photons = 0;
     for iter in 0..max_iter_cnt {
+        let iter_start_time = SystemTime::now();
         // 1. photon mapping pass
         let mut global_pm = PhotonMap::new(Global, total_photons);
         let mut caustic_pm = PhotonMap::new(Caustic, total_photons);
@@ -134,11 +138,28 @@ fn main() {
         //     "{:?}\t",
         //     sppm_pixels.lock().unwrap()[500][400].global[0].radius2
         // );
-
+        iter_durations.push(SystemTime::now().duration_since(iter_start_time).unwrap());
+        // println!(
+        //     "{}",
+        //     SystemTime::now()
+        //         .duration_since(start_time)
+        //         .unwrap()
+        //         .as_secs()
+        // );
         if iter % 10 == 0 || iter == max_iter_cnt - 1 {
             result.save(format!("output/iter-{}.png", iter)).unwrap();
         }
         // result.save("output/test.png").unwrap();
     }
     bar.finish();
+    for (i, duration) in iter_durations.into_iter().enumerate() {
+        println!("{}: {}s", i, duration.as_secs());
+    }
+    println!(
+        "Total: {}s",
+        SystemTime::now()
+            .duration_since(start_time)
+            .unwrap()
+            .as_secs()
+    );
 }

@@ -3,7 +3,7 @@ use image::{Rgb, Rgba};
 use nalgebra::{Matrix4, Matrix4x1};
 // use rand::distributions::Uniform;
 use rand::Rng;
-use std::f64::consts::PI;
+use std::f64::consts::{FRAC_1_PI, PI};
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, DivAssign, Index, Mul, MulAssign, Neg, Sub, SubAssign};
 
