@@ -10,8 +10,9 @@ use crate::{Ray, Vec3};
 use kd_tree::KdPoint;
 use rand::distributions::Distribution;
 use rand::distributions::WeightedIndex;
-use rand::thread_rng;
+use rand::{thread_rng, Rng};
 // use std::f64::consts::{FRAC_1_PI, PI};
+use crate::objects::rectangle::XZRectangle;
 use std::sync::Arc;
 
 #[derive(Default)]
@@ -123,31 +124,74 @@ impl Light for SphereDiffuseLight {
     }
 }
 
-// pub struct XZRectLight {
-//     area: XZRectangle,
-//     pub flux: Vec3,
-//     pub scale: f64,
-// }
-//
-// impl Light for XZRectLight {
-//     fn emit(&self) -> (Ray, Vec3) {
-//         let mut rng = rand::thread_rng();
-//         let (u, v) = (rng.gen::<f64>(), rng.gen::<f64>());
-//         let (x0, z0) = self.area.xz0;
-//         let (x1, z1) = self.area.xz1;
-//         let x = x0 + (x1 - x0) * u;
-//         let z = z0 + (z1 - z0) * v;
-//         let orig = Vec3::new(x, self.area.y, z);
-//         let w = Vec3::random_in_hemisphere(&Vec3::new(0., -1., 0.));
-//         (Ray::new(orig, w, 0.), self.flux * self.scale * (Vec3::new(0., -1., 0.) * w).max(0.))
-//     }
-//     fn power(&self) -> Vec3 {
-//         self.flux * self.scale
-//     }
-//     fn sample_li(&self, rec: &HitRecord, world: &World) -> Vec3 {
-//
-//     }
-// }
+#[derive(Clone)]
+pub struct XZRectLight {
+    area: XZRectangle,
+    pub flux: Vec3,
+    pub scale: f64,
+}
+
+impl XZRectLight {
+    pub fn new(xz0: (f64, f64), xz1: (f64, f64), y: f64, flux: Vec3, scale: f64) -> Self {
+        Self {
+            area: XZRectangle {
+                xz0,
+                xz1,
+                y,
+                material: Arc::new(DiffuseLight::new(ConstantTexture(flux))),
+            },
+            flux,
+            scale,
+        }
+    }
+
+    fn random_point_on_area(&self) -> Vec3 {
+        let mut rng = rand::thread_rng();
+        let (u, v) = (rng.gen_range(0. ..1.), rng.gen_range(0. ..1.));
+        let (x0, z0) = self.area.xz0;
+        let (x1, z1) = self.area.xz1;
+        Vec3::new(x0 + (x1 - x0) * u, self.area.y, z0 + (z1 - z0) * v)
+    }
+}
+
+impl Light for XZRectLight {
+    fn emit(&self) -> (Ray, Vec3, Vec3) {
+        let orig = self.random_point_on_area();
+        let w = Vec3::random_in_hemisphere(&Vec3::new(0., -1., 0.));
+        (
+            Ray::new(orig, w),
+            self.flux * self.scale * (Vec3::new(0., -1., 0.) * w).max(0.),
+            Vec3::new(0., -1., 0.),
+        )
+    }
+    fn power(&self) -> Vec3 {
+        self.flux * self.scale
+    }
+    fn sample_li(&self, rec: &HitRecord, world: &World, shadow_rays: usize) -> Vec3 {
+        let mut sample_li = Vec3::zero();
+        for _ in 0..shadow_rays {
+            let point_on_area = self.random_point_on_area();
+            let direct_to_light = (point_on_area - rec.p).unit();
+            let shadow_ray = Ray::new(rec.p, direct_to_light);
+            let t = (rec.p - point_on_area).length();
+            if world.bvh.hit(&shadow_ray, 0.0001, t - 0.0001).is_none() {
+                sample_li += Vec3::elemul(self.flux, rec.mat.bsdf(shadow_ray.dir, rec))
+                    * (rec.normal * direct_to_light).max(0.0);
+            }
+        }
+        sample_li / shadow_rays as f64
+    }
+}
+
+impl Hitable for XZRectLight {
+    fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        self.area.hit(r, t_min, t_max)
+    }
+
+    fn bounding_box(&self) -> Option<AABB> {
+        self.area.bounding_box()
+    }
+}
 
 pub struct AllLights {
     lights: Vec<Arc<dyn Light>>,

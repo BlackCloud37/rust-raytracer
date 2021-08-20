@@ -41,6 +41,7 @@ impl Hitable for XYRectangle {
     }
 }
 
+#[derive(Clone)]
 pub struct XZRectangle {
     pub xz0: (f64, f64),
     pub xz1: (f64, f64),

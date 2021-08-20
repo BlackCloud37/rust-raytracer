@@ -1,4 +1,5 @@
-use crate::light::SphereDiffuseLight;
+#![allow(unused_imports)]
+use crate::light::{SphereDiffuseLight, XZRectLight};
 use crate::material::{ConstantTexture, Dielectric, Lambertian, Material, Metal};
 use crate::objects::hit::Hitable;
 use crate::objects::rectangle::{XYRectangle, XZRectangle, YZRectangle};
@@ -17,13 +18,19 @@ fn cornell_box_scene() -> World {
     let green: Arc<dyn Material> = Arc::new(Lambertian::new(ConstantTexture(Vec3::new(
         0.12, 0.45, 0.15,
     ))));
-    let light = SphereDiffuseLight::new(
-        Vec3::new(275., 575., 275.),
-        50.,
-        Vec3::new(1., 1., 1.),
-        15000000.,
+    // let light = SphereDiffuseLight::new(
+    //     Vec3::new(275., 550., 275.),
+    //     50.,
+    //     Vec3::new(1., 1., 1.),
+    //     15000000.,
+    // );
+    let light = XZRectLight::new(
+        (213., 227.),
+        (343., 332.),
+        554.,
+        Vec3::new(3., 3., 3.),
+        10000000.,
     );
-
     let hitable_list: Vec<Arc<dyn Hitable>> = vec![
         Arc::new(YZRectangle {
             yz0: (0.0, 0.0),
@@ -61,12 +68,12 @@ fn cornell_box_scene() -> World {
             z: 555.,
             material: Arc::clone(&white),
         }),
-        Arc::new(XYRectangle {
-            xy0: (-10000., -10000.),
-            xy1: (10000., 10000.),
-            z: -801.,
-            material: Arc::clone(&white),
-        }),
+        // Arc::new(XYRectangle {
+        //     xy0: (0., 0.),
+        //     xy1: (555., 555.),
+        //     z: 0.,
+        //     material: Arc::clone(&white),
+        // }),
         Arc::new(Sphere {
             center: Vec3::new(200., 120., 300.),
             radius: 120.,
@@ -90,7 +97,7 @@ fn cornell_box_scene() -> World {
         Camera::new(
             (Vec3::new(278., 278., -800.), Vec3::new(278., 278., 278.)),
             Vec3::new(0., 1., 0.),
-            40.,
+            50.,
             1.,
             0.0,
             10.0,

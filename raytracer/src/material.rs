@@ -149,8 +149,8 @@ impl<T: Texture> Dielectric<T> {
     }
     pub fn reflectance(cosine: f64, ref_idx: f64) -> f64 {
         // Use Schlick's approximation for reflectance
-        let r0 = ((1. - ref_idx) / (1. + ref_idx)).powf(2.);
-        r0 + (1. - r0) * (1. - cosine).powf(5.)
+        let r0 = ((1. - ref_idx) / (1. + ref_idx)).powi(2);
+        r0 + (1. - r0) * (1. - cosine).powi(5)
     }
 }
 

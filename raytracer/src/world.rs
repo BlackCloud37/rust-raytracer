@@ -11,8 +11,9 @@ use std::sync::Arc;
 
 // const N_PHOTONS: usize = 400000;
 // const N_NEAREST: usize = 50;
+const PMPT: bool = false;
 const ALPHA: f64 = 0.7;
-const GATHER_CNT: usize = 2;
+const GATHER_CNT: usize = 4;
 // const FRAC_1_K: f64 = 1. / 10.;
 const FRAC_1_GATHER_CNT: f64 = 1. / GATHER_CNT as f64;
 pub enum PMType {
@@ -23,7 +24,6 @@ pub enum PMType {
 pub struct PhotonMap {
     pub pm_type: PMType,
     pub map: Option<KdTreeN<Photon, typenum::U3>>,
-    pub n_emitted: usize,
 }
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -64,12 +64,8 @@ pub struct SPPMPixel {
 }
 
 impl PhotonMap {
-    pub fn new(pm_type: PMType, n_emitted: usize) -> Self {
-        Self {
-            pm_type,
-            map: None,
-            n_emitted,
-        }
+    pub fn new(pm_type: PMType) -> Self {
+        Self { pm_type, map: None }
     }
 
     fn disk_factor(rec: &HitRecord, photon: &Photon) -> f64 {
@@ -118,10 +114,6 @@ impl PhotonMap {
         } else {
             panic!("photon map not built yet")
         }
-    }
-
-    pub fn adjust_flux(&self, flux_in: Vec3, radius2: f64) -> Vec3 {
-        flux_in / (PI * radius2 * self.n_emitted as f64)
     }
 }
 
@@ -180,6 +172,10 @@ impl Camera {
     }
 }
 
+pub fn adjust_flux(flux_in: Vec3, radius2: f64, photons: usize) -> Vec3 {
+    flux_in / (PI * radius2 * photons as f64)
+}
+
 pub struct World {
     pub bvh: BVHNode,
     pub cam: Camera,
@@ -210,8 +206,7 @@ impl World {
 
         // trace photon
         for _ in 0..n_emit_photons {
-            let (mut ray, mut power, norm) = self.lights.emit();
-            all_photons.push(Photon::new(ray.orig, power, ray.dir, norm)); // todo!(check)
+            let (mut ray, mut power, _norm) = self.lights.emit();
             let (mut has_specular, mut has_diffuse) = (false, false);
             while let Some(rec) = self.bvh.hit(&ray, 0.0001, f64::INFINITY) {
                 // hit sth., record if diffuse and update power/ray
@@ -240,51 +235,41 @@ impl World {
         }
 
         // build kd tree
-        global_pm.n_emitted += n_emit_photons;
         global_pm.map = Some(kd_tree::KdTree::build_by_ordered_float(all_photons));
-        caustic_pm.n_emitted += n_emit_photons;
         caustic_pm.map = Some(kd_tree::KdTree::build_by_ordered_float(caustic_photons));
     }
 
-    pub fn ray_color_pm(
+    pub fn ray_trace_update_sppm(
         &self,
         r: Ray,
         depth: i32,
         global_pm: &PhotonMap,
         caustic_pm: &PhotonMap,
         sppm_pixel: &mut SPPMPixel,
-    ) -> Vec3 {
-        let debug_render_pm = false;
-        let method_pmpt = true;
+    ) {
         if depth <= 0 {
-            return Vec3::zero();
+            return;
         }
         if let Some(rec) = self.bvh.hit(&r, 0.001, f64::INFINITY) {
-            if debug_render_pm {
-                let (x, y, z) = rec.p.xyz();
-                let within_global = global_pm
-                    .map
-                    .as_ref()
-                    .unwrap()
-                    .within_radius(&[x, y, z], 3.);
-                let within_caustic = caustic_pm
-                    .map
-                    .as_ref()
-                    .unwrap()
-                    .within_radius(&[x, y, z], 3.);
-                return Vec3::new(1., 0., 0.) * (within_global.len() as f64 / 50.)
-                    + Vec3::new(0., 1., 0.) * (within_caustic.len() as f64 / 50.);
-            }
-
-            let emission = rec.mat.emitted(&rec);
+            // if debug_render_pm {
+            //     let (x, y, z) = rec.p.xyz();
+            //     let within_global = global_pm
+            //         .map
+            //         .as_ref()
+            //         .unwrap()
+            //         .within_radius(&[x, y, z], 3.);
+            //     let within_caustic = caustic_pm
+            //         .map
+            //         .as_ref()
+            //         .unwrap()
+            //         .within_radius(&[x, y, z], 3.);
+            //     return Vec3::new(1., 0., 0.) * (within_global.len() as f64 / 50.)
+            //         + Vec3::new(0., 1., 0.) * (within_caustic.len() as f64 / 50.);
+            // }
             match rec.mat.scatter(&r, &rec) {
-                (Interaction::Diffuse, Some(_scattered), Some(attenuation)) => {
+                (Interaction::Diffuse, Some(_scattered), Some(_attenuation)) => {
                     sppm_pixel.caustic.update_caustic(&rec, caustic_pm);
-                    let caustic_flux =
-                        caustic_pm.adjust_flux(sppm_pixel.caustic.flux, sppm_pixel.caustic.radius2);
-
-                    let mut global_flux = Vec3::zero();
-                    if method_pmpt {
+                    if PMPT {
                         for i in 0..GATHER_CNT {
                             let global_sppm = &mut sppm_pixel.global[i];
                             let diffuse_ray =
@@ -293,34 +278,74 @@ impl World {
                                 self.bvh.hit(&diffuse_ray, 0.0001, f64::INFINITY)
                             {
                                 global_sppm.update_global(&another_rec, global_pm);
-                                global_flux +=
-                                    global_pm.adjust_flux(global_sppm.flux, global_sppm.radius2);
                             }
+                        }
+                    } else {
+                        sppm_pixel.global[0].update_global(&rec, global_pm);
+                    }
+                }
+                (_, Some(scattered), Some(_attenuation)) => self.ray_trace_update_sppm(
+                    scattered,
+                    depth - 1,
+                    global_pm,
+                    caustic_pm,
+                    sppm_pixel,
+                ),
+                _ => {}
+            }
+        }
+    }
+
+    pub fn ray_color(
+        &self,
+        r: Ray,
+        depth: i32,
+        sppm_pixel: &SPPMPixel,
+        global_photons: usize,
+        caustic_photons: usize,
+    ) -> Vec3 {
+        if depth <= 0 {
+            return Vec3::zero();
+        }
+        if let Some(rec) = self.bvh.hit(&r, 0.001, f64::INFINITY) {
+            let emission = rec.mat.emitted(&rec);
+            match rec.mat.scatter(&r, &rec) {
+                (Interaction::Diffuse, Some(_scattered), Some(attenuation)) => {
+                    let caustic_flux = adjust_flux(
+                        sppm_pixel.caustic.flux,
+                        sppm_pixel.caustic.radius2,
+                        caustic_photons,
+                    );
+                    let mut global_flux = Vec3::zero();
+                    if PMPT {
+                        for i in 0..GATHER_CNT {
+                            let global_sppm = sppm_pixel.global[i];
+                            global_flux +=
+                                adjust_flux(global_sppm.flux, global_sppm.radius2, global_photons);
                         }
                         global_flux *= FRAC_1_GATHER_CNT;
                         global_flux = Vec3::elemul(attenuation, global_flux);
-                        self.lights.sample_li(&rec, self, 10)
-                            + emission
-                            + caustic_flux
-                            + global_flux
-                        // emission + caustic_flux + global_flux
+                        self.lights.sample_li(&rec, self, 1) + emission + caustic_flux + global_flux
                     } else {
-                        sppm_pixel.global[0].update_global(&rec, global_pm);
-                        global_flux = global_pm
-                            .adjust_flux(sppm_pixel.global[0].flux, sppm_pixel.global[0].radius2);
+                        global_flux = adjust_flux(
+                            sppm_pixel.global[0].flux,
+                            sppm_pixel.global[0].radius2,
+                            global_photons,
+                        );
                         caustic_flux + global_flux + emission
+                        // emission
                     }
                 }
                 (_, Some(scattered), Some(attenuation)) => {
                     emission
                         + Vec3::elemul(
                             attenuation,
-                            self.ray_color_pm(
+                            self.ray_color(
                                 scattered,
                                 depth - 1,
-                                global_pm,
-                                caustic_pm,
                                 sppm_pixel,
+                                global_photons,
+                                caustic_photons,
                             ),
                         )
                 }
