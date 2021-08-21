@@ -104,7 +104,7 @@ impl<T: Texture> Lambertian<T> {
 
 impl<T: Texture> Material for Lambertian<T> {
     fn bsdf(&self, _r_dir: Vec3, rec: &HitRecord) -> Vec3 {
-        self.albedo.get_color(rec) * FRAC_1_PI
+        self.albedo.get_color(rec)
     }
     fn scatter(&self, r: &Ray, rec: &HitRecord) -> (Interaction, Option<Ray>, Option<Vec3>) {
         let scattered = Ray::new(rec.p, scattered_direction(rec.normal));

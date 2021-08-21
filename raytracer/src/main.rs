@@ -1,5 +1,6 @@
 #![allow(clippy::float_cmp)]
 
+mod camera;
 mod light;
 mod material;
 mod objects;
@@ -45,7 +46,7 @@ fn main() {
     let height = (width as f64 / aspect_ratio) as u32;
 
     let max_depth = 50;
-    let max_iter_cnt = 30;
+    let max_iter_cnt = 25;
     let sample_per_pixel = 256;
     let photon_per_iter = 200000;
 
