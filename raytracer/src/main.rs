@@ -9,7 +9,8 @@ mod scene;
 mod vec3;
 mod world;
 
-use crate::world::SPPMPixel;
+use crate::world::PMType::{Caustic, Global};
+use crate::world::{IrradianceCache, PhotonMap, SPPMPixel};
 use image::{ImageBuffer, Rgb, RgbImage};
 use indicatif::ProgressBar;
 use rand::Rng;
@@ -47,6 +48,7 @@ fn main() {
     let max_iter_cnt = 100;
     let sample_per_pixel = 256;
     let photon_per_iter = 200000;
+    let photons = photon_per_iter * max_iter_cnt;
 
     // create a channel to send objects between threads
     let (tx, rx) = channel();
@@ -93,7 +95,7 @@ fn main() {
                         let v = (y as f64 + rng.gen::<f64>()) / (height - 1) as f64;
                         let r = world_ptr.cam.get_ray(u, 1.0 - v); // y axis is reverted
                         world_ptr.ray_trace_update_sppm(
-                            r,
+                            &r,
                             max_depth,
                             global_pm,
                             caustic_pm,
@@ -120,6 +122,26 @@ fn main() {
     }
     bar.finish();
 
+    // build irradiance cache
+    let mut irradiance_cache = IrradianceCache::new(0.2);
+    let mut rng = rand::thread_rng();
+    for x in 0..width {
+        for y in 0..height {
+            let u = (x as f64 + rng.gen::<f64>()) / (width - 1) as f64;
+            let v = (y as f64 + rng.gen::<f64>()) / (height - 1) as f64;
+            let r = world.cam.get_ray(u, 1.0 - v); // y axis is reverted
+            let sppm_local = sppm_pixels.lock().unwrap()[x as usize][y as usize];
+            world.build_irradiance_cache(
+                &mut irradiance_cache,
+                &r,
+                max_depth,
+                &sppm_local,
+                photons,
+            );
+        }
+    }
+
+    let irradiance_cache = Arc::new(irradiance_cache);
     let ray_tracing_start_time = SystemTime::now();
     // ray tracing only
     let bar = ProgressBar::new(n_jobs as u64);
@@ -128,13 +150,14 @@ fn main() {
         let tx = tx.clone();
         let world_ptr = world.clone();
         let sppm_pixels_ptr = sppm_pixels.clone();
+        let irradiance_cache_ptr = irradiance_cache.clone();
         pool.execute(move || {
             // here, we render some of the rows of image in one thread
             let row_begin = height as usize * i / n_jobs;
             let row_end = height as usize * (i + 1) / n_jobs;
             let render_height = row_end - row_begin;
             let mut img: RgbImage = ImageBuffer::new(width as u32, render_height as u32);
-            let photons = photon_per_iter * max_iter_cnt;
+
             let mut rng = rand::thread_rng();
             for x in 0..width {
                 // img_y is the row in partial rendered image
@@ -148,8 +171,14 @@ fn main() {
                         let u = (x as f64 + rng.gen::<f64>()) / (width - 1) as f64;
                         let v = (y as f64 + rng.gen::<f64>()) / (height - 1) as f64;
                         let r = world_ptr.cam.get_ray(u, 1.0 - v); // y axis is reverted
-                        pixel_color +=
-                            world_ptr.ray_color(r, max_depth, &sppm_local, photons, photons);
+                        pixel_color += world_ptr.ray_color(
+                            &r,
+                            max_depth,
+                            &sppm_local,
+                            irradiance_cache_ptr.as_ref(),
+                            photons,
+                            photons,
+                        );
                     }
                     pixel_color /= sample_per_pixel as f64;
                     let pixel = img.get_pixel_mut(x as u32, img_y as u32);

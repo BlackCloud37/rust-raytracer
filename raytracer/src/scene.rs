@@ -30,7 +30,7 @@ fn cornell_box_scene() -> World {
         (343., 332.),
         554.,
         Vec3::new(1., 1., 1.),
-        2000000.,
+        10000000.,
     );
     let hitable_list: Vec<Arc<dyn Hitable>> = vec![
         Arc::new(YZRectangle {
