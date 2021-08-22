@@ -9,6 +9,7 @@ mod scene;
 mod vec3;
 mod world;
 
+use crate::world::SPPMPixel;
 use image::{ImageBuffer, Rgb, RgbImage};
 use indicatif::ProgressBar;
 use rand::Rng;
@@ -16,9 +17,6 @@ pub use ray::Ray;
 use scene::select_scene;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex};
-// use std::time::SystemTime;
-use crate::world::PMType::{Caustic, Global};
-use crate::world::{PhotonMap, SPPMPixel};
 use std::time::SystemTime;
 use threadpool::ThreadPool;
 pub use vec3::Vec3;
@@ -46,7 +44,7 @@ fn main() {
     let height = (width as f64 / aspect_ratio) as u32;
 
     let max_depth = 50;
-    let max_iter_cnt = 25;
+    let max_iter_cnt = 100;
     let sample_per_pixel = 256;
     let photon_per_iter = 200000;
 
@@ -57,16 +55,16 @@ fn main() {
     let bar = ProgressBar::new(n_jobs as u64 * max_iter_cnt as u64);
     // use Arc to pass one instance of World to multiple threads
     let world = Arc::new(select_scene(0));
-    let sppm_pixels = vec![vec![SPPMPixel::default(); height as usize]; width];
-    let sppm_pixels = Arc::new(Mutex::new(sppm_pixels));
+    let sppm_pixels = Arc::new(Mutex::new(vec![
+        vec![SPPMPixel::default(); height as usize];
+        width
+    ]));
 
     let start_time = SystemTime::now();
     // sppm, get flux estimation
-    for _iter in 0..max_iter_cnt {
+    for _sppm_iter in 0..max_iter_cnt {
         // 1. photon mapping pass
-        let mut global_pm = PhotonMap::new(Global);
-        let mut caustic_pm = PhotonMap::new(Caustic);
-        world.gen_photon_maps(photon_per_iter, &mut global_pm, &mut caustic_pm);
+        let (global_pm, caustic_pm) = world.gen_photon_maps(photon_per_iter);
         let global_pm = Arc::new(global_pm);
         let caustic_pm = Arc::new(caustic_pm);
 

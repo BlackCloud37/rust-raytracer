@@ -4,18 +4,16 @@ use crate::light::{AllLights, Light, Photon};
 use crate::material::Interaction;
 use crate::objects::bvh::BVHNode;
 use crate::objects::hit::{HitRecord, Hitable};
+use crate::world::PMType::{Caustic, Global};
 use crate::{Ray, Vec3};
 use kd_tree::KdTreeN;
 use std::f64::consts::PI;
 use std::sync::Arc;
 
-const PMPT: bool = false;
+const PMPT: bool = true;
 const ALPHA: f64 = 0.7;
-const GATHER_CNT: usize = 4;
+const GATHER_CNT: usize = 1;
 const FRAC_1_GATHER_CNT: f64 = 1. / GATHER_CNT as f64;
-
-
-
 
 pub enum PMType {
     Global,
@@ -24,7 +22,7 @@ pub enum PMType {
 
 pub struct PhotonMap {
     pub pm_type: PMType,
-    pub map: Option<KdTreeN<Photon, typenum::U3>>,
+    pub map: KdTreeN<Photon, typenum::U3>,
 }
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -65,8 +63,8 @@ pub struct SPPMPixel {
 }
 
 impl PhotonMap {
-    pub fn new(pm_type: PMType) -> Self {
-        Self { pm_type, map: None }
+    pub fn new(pm_type: PMType, map: KdTreeN<Photon, typenum::U3>) -> Self {
+        Self { pm_type, map }
     }
 
     fn disk_factor(rec: &HitRecord, photon: &Photon) -> f64 {
@@ -75,45 +73,39 @@ impl PhotonMap {
     /// KNN Estimate
     /// return (flux, radius2)
     pub fn estimate_flux_by_count(&self, rec: &HitRecord, n_nearest: usize) -> (Vec3, f64) {
-        if let Some(pm) = self.map.as_ref() {
-            let p = rec.p.xyz_arr();
-            let nearest = pm.nearests(&p, n_nearest);
-            let mut flux = Vec3::zero();
-            let mut radius2: f64 = 0.;
-            for kd_tree::ItemAndDistance {
-                item: photon,
-                squared_distance,
-            } in nearest.into_iter()
-            {
-                radius2 = radius2.max(squared_distance);
-                let disk_factor = PhotonMap::disk_factor(rec, photon);
-                flux += Vec3::elemul(rec.mat.bsdf(*photon.direction(), &rec), *photon.power())
-                    * (1. - disk_factor);
-            }
-            (flux, radius2)
-        } else {
-            panic!("photon map not built yet")
+        let pm = self.map.as_ref();
+        let p = rec.p.xyz_arr();
+        let nearest = pm.nearests(&p, n_nearest);
+        let mut flux = Vec3::zero();
+        let mut radius2: f64 = 0.;
+        for kd_tree::ItemAndDistance {
+            item: photon,
+            squared_distance,
+        } in nearest.into_iter()
+        {
+            radius2 = radius2.max(squared_distance);
+            let disk_factor = PhotonMap::disk_factor(rec, photon);
+            flux += Vec3::elemul(rec.mat.bsdf(*photon.direction(), &rec), *photon.power())
+                * (1. - disk_factor);
         }
+        (flux, radius2)
     }
 
     /// return (flux, photon_cnt)
     pub fn estimate_flux_within_radius(&self, rec: &HitRecord, radius: f64) -> (Vec3, usize) {
         // let frac_1_radius = 1. / radius;
 
-        if let Some(pm) = self.map.as_ref() {
-            let p = rec.p.xyz_arr();
-            let nearest = pm.within_radius(&p, radius);
-            let mut flux = Vec3::zero();
-            let photons = nearest.len();
-            for photon in nearest {
-                let disk_factor = PhotonMap::disk_factor(rec, photon);
-                flux += Vec3::elemul(rec.mat.bsdf(*photon.direction(), &rec), *photon.power())
-                    * (1. - disk_factor);
-            }
-            (flux, photons)
-        } else {
-            panic!("photon map not built yet")
+        let pm = self.map.as_ref();
+        let p = rec.p.xyz_arr();
+        let nearest = pm.within_radius(&p, radius);
+        let mut flux = Vec3::zero();
+        let photons = nearest.len();
+        for photon in nearest {
+            let disk_factor = PhotonMap::disk_factor(rec, photon);
+            flux += Vec3::elemul(rec.mat.bsdf(*photon.direction(), &rec), *photon.power())
+                * (1. - disk_factor);
         }
+        (flux, photons)
     }
 }
 
@@ -140,12 +132,7 @@ impl World {
         }
     }
 
-    pub fn gen_photon_maps(
-        &self,
-        n_emit_photons: usize,
-        global_pm: &mut PhotonMap,
-        caustic_pm: &mut PhotonMap,
-    ) {
+    pub fn gen_photon_maps(&self, n_emit_photons: usize) -> (PhotonMap, PhotonMap) {
         let mut all_photons = vec![];
         let mut caustic_photons = vec![];
 
@@ -180,8 +167,13 @@ impl World {
         }
 
         // build kd tree
-        global_pm.map = Some(kd_tree::KdTree::build_by_ordered_float(all_photons));
-        caustic_pm.map = Some(kd_tree::KdTree::build_by_ordered_float(caustic_photons));
+        (
+            PhotonMap::new(Global, kd_tree::KdTree::build_by_ordered_float(all_photons)),
+            PhotonMap::new(
+                Caustic,
+                kd_tree::KdTree::build_by_ordered_float(caustic_photons),
+            ),
+        )
     }
 
     pub fn ray_trace_update_sppm(
