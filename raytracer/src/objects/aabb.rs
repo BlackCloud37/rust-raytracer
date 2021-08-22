@@ -1,18 +1,11 @@
+#![allow(dead_code)]
 use crate::{Ray, Vec3};
 use std::mem::swap;
 
+#[derive(Copy, Clone, Default)]
 pub struct AABB {
     pub minimum: Vec3,
     pub maximum: Vec3,
-}
-
-impl Clone for AABB {
-    fn clone(&self) -> Self {
-        Self {
-            minimum: self.minimum,
-            maximum: self.maximum,
-        }
-    }
 }
 
 impl AABB {
@@ -49,5 +42,40 @@ impl AABB {
             box0.maximum.z.max(box1.maximum.z),
         );
         AABB::new(small, big)
+    }
+    pub fn is_intersect_box(&self, other: &AABB) -> bool {
+        (self.minimum.x <= other.maximum.x && self.maximum.x >= other.minimum.x)
+            && (self.minimum.y <= other.maximum.y && self.maximum.y >= other.minimum.y)
+            && (self.minimum.z <= other.maximum.z && self.maximum.z >= other.minimum.z)
+    }
+    pub fn is_intersect_point(&self, other: &Vec3) -> bool {
+        (other.x >= self.minimum.x && other.x <= self.maximum.x)
+            && (other.y >= self.minimum.y && other.y <= self.maximum.y)
+            && (other.z >= self.minimum.z && other.z <= self.maximum.z)
+    }
+    pub fn oct_sub_box(&self) -> Vec<AABB> {
+        let (min_x, min_y, min_z) = self.minimum.xyz();
+        let (max_x, max_y, max_z) = self.maximum.xyz();
+        let (lx, ly, lz) = (
+            (max_x - min_x) / 2.,
+            (max_y - min_y) / 2.,
+            (max_z - min_z) / 2.,
+        );
+        let maximum = |minimum: Vec3| Vec3::new(minimum.x + lx, minimum.y + ly, minimum.z + lz);
+        let minimums = [
+            self.minimum,
+            Vec3::new(min_x + lx, min_y, min_z),
+            Vec3::new(min_x, min_y + ly, min_z),
+            Vec3::new(min_x, min_y, min_z + lz),
+            Vec3::new(min_x + lx, min_y + ly, min_z),
+            Vec3::new(min_x + lx, min_y, min_z + lz),
+            Vec3::new(min_x, min_y + ly, min_z + lz),
+            Vec3::new(min_x + lx, min_y + ly, min_z + lz),
+        ];
+        minimums
+            .iter()
+            .map(|minimum| Self::new(*minimum, maximum(*minimum)))
+            .take(8)
+            .collect::<Vec<AABB>>()
     }
 }

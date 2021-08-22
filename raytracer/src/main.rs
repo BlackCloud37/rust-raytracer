@@ -1,6 +1,7 @@
 #![allow(clippy::float_cmp)]
 
 mod camera;
+mod irradiancecache;
 mod light;
 mod material;
 mod objects;
@@ -9,8 +10,8 @@ mod scene;
 mod vec3;
 mod world;
 
-use crate::world::PMType::{Caustic, Global};
-use crate::world::{IrradianceCache, PhotonMap, SPPMPixel};
+// use crate::irradiancecache::IrradianceCache;
+use crate::world::SPPMPixel;
 use image::{ImageBuffer, Rgb, RgbImage};
 use indicatif::ProgressBar;
 use rand::Rng;
@@ -45,7 +46,7 @@ fn main() {
     let height = (width as f64 / aspect_ratio) as u32;
 
     let max_depth = 50;
-    let max_iter_cnt = 100;
+    let max_iter_cnt = 25;
     let sample_per_pixel = 256;
     let photon_per_iter = 200000;
     let photons = photon_per_iter * max_iter_cnt;
@@ -86,11 +87,11 @@ fn main() {
 
                 let mut rng = rand::thread_rng();
                 let (global_pm, caustic_pm) = (global_pm_ptr.as_ref(), caustic_pm_ptr.as_ref());
-                for x in 0..width {
+                for (x, sppm_local) in sppm_local.iter_mut().enumerate().take(width) {
                     // img_y is the row in partial rendered image
                     // y is real position in final image
                     for (img_y, y) in (row_begin..row_end).enumerate() {
-                        sppm_local[x][img_y] = sppm_pixels_ptr.lock().unwrap()[x][y];
+                        sppm_local[img_y] = sppm_pixels_ptr.lock().unwrap()[x][y];
                         let u = (x as f64 + rng.gen::<f64>()) / (width - 1) as f64;
                         let v = (y as f64 + rng.gen::<f64>()) / (height - 1) as f64;
                         let r = world_ptr.cam.get_ray(u, 1.0 - v); // y axis is reverted
@@ -99,7 +100,7 @@ fn main() {
                             max_depth,
                             global_pm,
                             caustic_pm,
-                            &mut sppm_local[x][img_y],
+                            &mut sppm_local[img_y],
                         );
                     }
                 }
@@ -108,13 +109,9 @@ fn main() {
             });
         }
         for (rows, sppm) in rx.iter().take(n_jobs) {
-            // idx is the corresponding row in partial-rendered image
-            for (idx, row) in rows.enumerate() {
-                for col in 0..width {
-                    let row = row as u32;
-                    let idx = idx as u32;
-                    let mut sppm_pixels = sppm_pixels.lock().unwrap();
-                    (*sppm_pixels)[col][row as usize] = sppm[col][idx as usize];
+            for (col, sppm_col) in sppm.iter().enumerate().take(width) {
+                for (idx, row) in (rows.start..rows.end).enumerate() {
+                    (*sppm_pixels.lock().unwrap())[col][row] = sppm_col[idx];
                 }
             }
             bar.inc(1);
@@ -122,26 +119,27 @@ fn main() {
     }
     bar.finish();
 
-    // build irradiance cache
-    let mut irradiance_cache = IrradianceCache::new(0.2);
-    let mut rng = rand::thread_rng();
-    for x in 0..width {
-        for y in 0..height {
-            let u = (x as f64 + rng.gen::<f64>()) / (width - 1) as f64;
-            let v = (y as f64 + rng.gen::<f64>()) / (height - 1) as f64;
-            let r = world.cam.get_ray(u, 1.0 - v); // y axis is reverted
-            let sppm_local = sppm_pixels.lock().unwrap()[x as usize][y as usize];
-            world.build_irradiance_cache(
-                &mut irradiance_cache,
-                &r,
-                max_depth,
-                &sppm_local,
-                photons,
-            );
-        }
-    }
+    // // build irradiance cache
+    // let mut irradiance_cache = IrradianceCache::new(0.2);
+    // let mut rng = rand::thread_rng();
+    // for x in 0..width {
+    //     for y in 0..height {
+    //         let u = (x as f64 + rng.gen::<f64>()) / (width - 1) as f64;
+    //         let v = (y as f64 + rng.gen::<f64>()) / (height - 1) as f64;
+    //         let r = world.cam.get_ray(u, 1.0 - v); // y axis is reverted
+    //         let sppm_local = sppm_pixels.lock().unwrap()[x as usize][y as usize];
+    //         world.build_irradiance_cache(
+    //             &mut irradiance_cache,
+    //             &r,
+    //             max_depth,
+    //             &sppm_local,
+    //             photons,
+    //         );
+    //     }
+    // }
+    // irradiance_cache.build_tree();
 
-    let irradiance_cache = Arc::new(irradiance_cache);
+    // let irradiance_cache = Arc::new(irradiance_cache);
     let ray_tracing_start_time = SystemTime::now();
     // ray tracing only
     let bar = ProgressBar::new(n_jobs as u64);
@@ -150,7 +148,7 @@ fn main() {
         let tx = tx.clone();
         let world_ptr = world.clone();
         let sppm_pixels_ptr = sppm_pixels.clone();
-        let irradiance_cache_ptr = irradiance_cache.clone();
+        // let irradiance_cache_ptr = irradiance_cache.clone();
         pool.execute(move || {
             // here, we render some of the rows of image in one thread
             let row_begin = height as usize * i / n_jobs;
@@ -164,21 +162,13 @@ fn main() {
                 // y is real position in final image
                 for (img_y, y) in (row_begin..row_end).enumerate() {
                     let sppm_local = sppm_pixels_ptr.lock().unwrap()[x][y];
-
-                    // world_ptr.ray_trace_update_sppm(r, max_depth, global_pm, caustic_pm, &mut sppm_local);
                     let mut pixel_color = Vec3::zero();
                     for _s in 0..sample_per_pixel {
                         let u = (x as f64 + rng.gen::<f64>()) / (width - 1) as f64;
                         let v = (y as f64 + rng.gen::<f64>()) / (height - 1) as f64;
                         let r = world_ptr.cam.get_ray(u, 1.0 - v); // y axis is reverted
-                        pixel_color += world_ptr.ray_color(
-                            &r,
-                            max_depth,
-                            &sppm_local,
-                            irradiance_cache_ptr.as_ref(),
-                            photons,
-                            photons,
-                        );
+                        pixel_color +=
+                            world_ptr.ray_color(&r, max_depth, &sppm_local, None, photons, photons);
                     }
                     pixel_color /= sample_per_pixel as f64;
                     let pixel = img.get_pixel_mut(x as u32, img_y as u32);

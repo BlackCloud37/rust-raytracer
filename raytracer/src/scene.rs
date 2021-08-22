@@ -19,18 +19,12 @@ fn cornell_box_scene() -> World {
     let blue: Arc<dyn Material> = Arc::new(Lambertian::new(ConstantTexture(Vec3::new(
         0.25, 0.25, 0.75,
     ))));
-    // let light = SphereDiffuseLight::new(
-    //     Vec3::new(275., 550., 275.),
-    //     50.,
-    //     Vec3::new(1., 1., 1.),
-    //     15000000.,
-    // );
     let light = XZRectLight::new(
         (213., 227.),
         (343., 332.),
         554.,
         Vec3::new(1., 1., 1.),
-        10000000.,
+        1000000.,
     );
     let hitable_list: Vec<Arc<dyn Hitable>> = vec![
         Arc::new(YZRectangle {

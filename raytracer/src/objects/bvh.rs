@@ -101,6 +101,6 @@ impl Hitable for BVHNode {
         }
     }
     fn bounding_box(&self) -> Option<AABB> {
-        Some(self.bounding_box.clone())
+        Some(self.bounding_box)
     }
 }

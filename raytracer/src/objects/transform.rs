@@ -163,6 +163,6 @@ impl Hitable for Transform {
         }
     }
     fn bounding_box(&self) -> Option<AABB> {
-        Some(self.bounding_box.as_ref().unwrap().clone())
+        Some(*self.bounding_box.as_ref().unwrap())
     }
 }
