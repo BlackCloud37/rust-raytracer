@@ -15,7 +15,7 @@ use rand::{thread_rng, Rng};
 use crate::objects::rectangle::XZRectangle;
 use std::sync::Arc;
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct Photon {
     position: Vec3,
     power: Vec3,

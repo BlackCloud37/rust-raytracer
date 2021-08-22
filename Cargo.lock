@@ -953,6 +953,7 @@ dependencies = [
  "imageproc",
  "indicatif",
  "kd-tree",
+ "lazy_static",
  "nalgebra",
  "rand 0.8.4",
  "raytracer_codegen",

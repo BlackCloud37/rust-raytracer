@@ -7,6 +7,7 @@ use crate::objects::rectangle::{XYRectangle, XZRectangle, YZRectangle};
 use crate::objects::sphere::Sphere;
 use crate::world::World;
 use crate::Vec3;
+use crate::CONFIGS;
 use std::sync::Arc;
 
 fn cornell_box_scene() -> World {
@@ -66,12 +67,18 @@ fn cornell_box_scene() -> World {
         Arc::new(Sphere {
             center: Vec3::new(140., 100., 240.),
             radius: 100.,
-            material: Arc::new(Dielectric::new(1.5, ConstantTexture(Vec3::ones() * 0.999))),
+            material: Arc::new(Dielectric::new(
+                1.5,
+                ConstantTexture(Vec3::new(0.999, 0.999, 0.999)),
+            )),
         }),
         Arc::new(Sphere {
             center: Vec3::new(400., 100., 360.),
             radius: 100.,
-            material: Arc::new(Metal::new(ConstantTexture(Vec3::ones() * 0.999), 0.)),
+            material: Arc::new(Metal::new(
+                ConstantTexture(Vec3::new(0.999, 0.999, 0.999)),
+                0.,
+            )),
         }),
         Arc::new(light.clone()),
     ];
@@ -82,7 +89,7 @@ fn cornell_box_scene() -> World {
             (Vec3::new(278., 278., -800.), Vec3::new(278., 278., 278.)),
             Vec3::new(0., 1., 0.),
             50.,
-            1.,
+            CONFIGS.aspect_ratio,
             0.0,
             10.0,
         ),
