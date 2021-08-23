@@ -70,4 +70,3 @@ fn main() {
             .as_secs(),
     );
 }
-

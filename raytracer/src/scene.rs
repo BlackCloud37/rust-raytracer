@@ -2,9 +2,12 @@
 use crate::camera::Camera;
 use crate::light::{SphereDiffuseLight, XZRectLight};
 use crate::material::{ConstantTexture, Dielectric, Lambertian, Material, Metal};
+use crate::objects::cube::Cube;
 use crate::objects::hit::Hitable;
+use crate::objects::mesh::Mesh;
 use crate::objects::rectangle::{XYRectangle, XZRectangle, YZRectangle};
 use crate::objects::sphere::Sphere;
+use crate::objects::transform::Transform;
 use crate::world::World;
 use crate::Vec3;
 use crate::CONFIGS;
@@ -81,6 +84,17 @@ fn cornell_box_scene() -> World {
             )),
         }),
         Arc::new(light.clone()),
+        Arc::new(Transform::new(
+            Vec3::zero(),
+            Vec3::ones() * 50.,
+            Vec3::new(100., 50., 100.),
+            Arc::new(Mesh::load_obj("data/mesh/cube.obj".into(), white.clone())),
+        )),
+        Arc::new(Cube::new(
+            Vec3::new(300., 0., 100.),
+            Vec3::new(380., 100., 180.),
+            white.clone(),
+        )),
     ];
 
     World::new(

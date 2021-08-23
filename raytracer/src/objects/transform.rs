@@ -26,9 +26,6 @@ impl Transform {
             degrees_to_radians(rotate_in_degree.z),
         );
         let mut trans = Matrix4::new(
-            scale.x, 0., 0., 0., 0., scale.y, 0., 0., 0., 0., scale.z, 0., 0., 0., 0., 1.,
-        );
-        trans *= Matrix4::new(
             1.,
             0.,
             0.,
@@ -46,6 +43,10 @@ impl Transform {
             0.,
             1.,
         );
+        trans *= Matrix4::new(
+            scale.x, 0., 0., 0., 0., scale.y, 0., 0., 0., 0., scale.z, 0., 0., 0., 0., 1.,
+        );
+
         trans *= Matrix4::new(
             // rotate X
             1.,

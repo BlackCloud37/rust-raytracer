@@ -41,9 +41,9 @@ impl HitRecord {
     pub fn set_face_normal(&mut self, r: &Ray, outward_normal: Vec3) {
         self.front_face = r.dir * outward_normal < 0.;
         self.normal = if self.front_face {
-            outward_normal
+            outward_normal.unit()
         } else {
-            -outward_normal
+            -outward_normal.unit()
         };
     }
 }
